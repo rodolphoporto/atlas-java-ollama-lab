@@ -1,6 +1,6 @@
 # ATLAS-JAVA-001 — Java, Spring Boot e Ollama
 
-Projeto de estudo com Java 21, Spring Boot 3.5 e Maven. O endpoint `POST /api/ai/chat` envia uma mensagem ao Ollama pela API HTTP usando o `RestClient` do Spring.
+Projeto de estudo com Java 21, Spring Boot 3.5 e Maven. Os endpoints enviam mensagens ao Ollama pela API HTTP usando o `RestClient` do Spring, com resposta completa ou streaming SSE.
 
 ## Pré-requisitos
 
@@ -65,6 +65,31 @@ Resposta esperada:
 
 Mensagem ausente ou vazia retorna HTTP 400. Falha de conexão, timeout ou erro HTTP do Ollama retorna HTTP 502 sem expor detalhes internos.
 
+### Streaming SSE
+
+Use `-N` no `curl` para exibir cada evento assim que ele chegar:
+
+```bash
+curl -N http://localhost:8080/api/ai/chat/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"Explique records em Java em três frases."}'
+```
+
+O fluxo emite zero ou mais eventos `token`, seguidos de `done`:
+
+```text
+event: token
+data: {"model":"qwen3:4b-instruct","content":"Um record"}
+
+event: token
+data: {"model":"qwen3:4b-instruct","content":" é..."}
+
+event: done
+data: {"model":"qwen3:4b-instruct","done":true}
+```
+
+Se o Ollama falhar depois que o HTTP 200 e o fluxo SSE já começaram, a API envia `event: error` com uma mensagem segura e encerra a conexão. O contrato completo está em [`openapi.yaml`](openapi.yaml).
+
 ## Configuração externa
 
 Nenhum segredo é armazenado no projeto. As opções podem ser alteradas por variáveis de ambiente:
@@ -92,5 +117,5 @@ export PATH="$JAVA_HOME/bin:$PATH"
 mvn clean verify
 ```
 
-Eles verificam o contrato HTTP, a validação, o mapeamento de erros e a requisição enviada à API do Ollama.
+Eles verificam o contrato HTTP, a validação, o mapeamento de erros, a requisição enviada à API do Ollama e a conversão do NDJSON do Ollama em eventos SSE.
 

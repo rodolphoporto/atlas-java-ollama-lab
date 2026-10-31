@@ -1,0 +1,77 @@
+openapi: 3.1.0
+info:
+  title: ATLAS-JAVA-001 API
+  version: 0.1.0
+  description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/ai/chat:
+    post:
+      summary: Envia uma mensagem e aguarda a resposta completa
+      operationId: chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Resposta completa do modelo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: Mensagem ausente ou vazia
+        '502':
+          description: Falha antes de concluir a chamada ao Ollama
+  /api/ai/chat/stream:
+    post:
+      summary: Envia uma mensagem e transmite a resposta por Server-Sent Events
+      operationId: streamChat
+      description: |
+        Emite eventos `token` com fragmentos da resposta e termina com `done`.
+        Depois que o streaming começa, falhas do Ollama são enviadas como evento `error`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Fluxo SSE com eventos token, done ou error
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                tokens:
+                  value: |
+                    event: token
+                    data: {"model":"qwen3:4b-instruct","content":"Olá"}
+
+                    event: done
+                    data: {"model":"qwen3:4b-instruct","done":true}
+
+        '400':
+          description: Mensagem ausente ou vazia
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+    ChatResponse:
+      type: object
+      required: [model, answer]
+      properties:
+        model:
+          type: string
+        answer:
+          type: string
