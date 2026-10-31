@@ -24,6 +24,158 @@ function setBusy(busy) {
     if (!busy) input.focus();
 }
 
+function appendInlineMarkdown(parent, text) {
+    const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\(https?:\/\/[^)\s]+\))/g;
+    let cursor = 0;
+
+    for (const match of text.matchAll(pattern)) {
+        parent.append(document.createTextNode(text.slice(cursor, match.index)));
+        const token = match[0];
+
+        if (token.startsWith('`')) {
+            const code = document.createElement('code');
+            code.textContent = token.slice(1, -1);
+            parent.append(code);
+        } else if (token.startsWith('**')) {
+            const strong = document.createElement('strong');
+            strong.textContent = token.slice(2, -2);
+            parent.append(strong);
+        } else if (token.startsWith('*')) {
+            const emphasis = document.createElement('em');
+            emphasis.textContent = token.slice(1, -1);
+            parent.append(emphasis);
+        } else {
+            const parts = token.match(/^\[([^\]]+)]\((https?:\/\/[^)]+)\)$/);
+            const link = document.createElement('a');
+            link.textContent = parts[1];
+            link.href = parts[2];
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            parent.append(link);
+        }
+        cursor = match.index + token.length;
+    }
+
+    parent.append(document.createTextNode(text.slice(cursor)));
+}
+
+function createCodeBlock(language, codeText) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'code-block';
+
+    const header = document.createElement('div');
+    header.className = 'code-header';
+
+    const label = document.createElement('span');
+    label.textContent = language || 'código';
+
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'copy-code';
+    copy.textContent = 'Copiar';
+    copy.setAttribute('aria-label', 'Copiar bloco de código');
+
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    code.textContent = codeText.replace(/\n$/, '');
+    pre.append(code);
+    header.append(label, copy);
+    wrapper.append(header, pre);
+    return wrapper;
+}
+
+function renderMarkdown(target, markdown) {
+    target.replaceChildren();
+    const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+    let paragraph = [];
+    let list = null;
+    let listType = null;
+    let inCode = false;
+    let codeLanguage = '';
+    let codeLines = [];
+
+    const flushParagraph = () => {
+        if (!paragraph.length) return;
+        const element = document.createElement('p');
+        appendInlineMarkdown(element, paragraph.join('\n'));
+        target.append(element);
+        paragraph = [];
+    };
+
+    const flushList = () => {
+        if (list) target.append(list);
+        list = null;
+        listType = null;
+    };
+
+    const flushCode = () => {
+        target.append(createCodeBlock(codeLanguage, codeLines.join('\n')));
+        codeLines = [];
+        codeLanguage = '';
+    };
+
+    for (const line of lines) {
+        const fence = line.match(/^```([\w#+.-]*)\s*$/);
+        if (fence) {
+            if (inCode) {
+                flushCode();
+                inCode = false;
+            } else {
+                flushParagraph();
+                flushList();
+                inCode = true;
+                codeLanguage = fence[1];
+            }
+            continue;
+        }
+
+        if (inCode) {
+            codeLines.push(line);
+            continue;
+        }
+
+        const heading = line.match(/^(#{1,3})\s+(.+)$/);
+        const unordered = line.match(/^[-*]\s+(.+)$/);
+        const ordered = line.match(/^\d+\.\s+(.+)$/);
+        const quote = line.match(/^>\s?(.*)$/);
+
+        if (heading) {
+            flushParagraph();
+            flushList();
+            const element = document.createElement(`h${heading[1].length + 2}`);
+            appendInlineMarkdown(element, heading[2]);
+            target.append(element);
+        } else if (unordered || ordered) {
+            flushParagraph();
+            const nextType = unordered ? 'ul' : 'ol';
+            if (listType !== nextType) {
+                flushList();
+                listType = nextType;
+                list = document.createElement(nextType);
+            }
+            const item = document.createElement('li');
+            appendInlineMarkdown(item, (unordered || ordered)[1]);
+            list.append(item);
+        } else if (quote) {
+            flushParagraph();
+            flushList();
+            const element = document.createElement('blockquote');
+            appendInlineMarkdown(element, quote[1]);
+            target.append(element);
+        } else if (!line.trim()) {
+            flushParagraph();
+            flushList();
+        } else {
+            flushList();
+            paragraph.push(line);
+        }
+    }
+
+    flushParagraph();
+    flushList();
+    if (inCode) flushCode();
+}
+
 function addMessage(role, text = '') {
     const article = document.createElement('article');
     article.className = `message ${role}`;
@@ -40,14 +192,16 @@ function addMessage(role, text = '') {
     author.className = 'message-author';
     author.textContent = role === 'user' ? 'VOCÊ' : 'ATLAS';
 
-    const paragraph = document.createElement('p');
-    paragraph.textContent = text;
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    if (role === 'assistant') renderMarkdown(content, text);
+    else content.textContent = text;
 
-    bubble.append(author, paragraph);
+    bubble.append(author, content);
     article.append(avatar, bubble);
     messages.append(article);
     messages.scrollTop = messages.scrollHeight;
-    return paragraph;
+    return content;
 }
 
 function parseEvent(block) {
@@ -69,6 +223,18 @@ async function sendMessage(message) {
 
     activeRequest = new AbortController();
     let completed = false;
+    let answerText = '';
+    let renderPending = false;
+
+    const refreshAnswer = () => {
+        if (renderPending) return;
+        renderPending = true;
+        requestAnimationFrame(() => {
+            renderMarkdown(answer, answerText);
+            messages.scrollTop = messages.scrollHeight;
+            renderPending = false;
+        });
+    };
 
     try {
         const response = await fetch('/api/ai/chat/stream', {
@@ -100,8 +266,8 @@ async function sendMessage(message) {
                 const payload = JSON.parse(parsed.data);
 
                 if (parsed.event === 'token') {
-                    answer.textContent += payload.content || '';
-                    messages.scrollTop = messages.scrollHeight;
+                    answerText += payload.content || '';
+                    refreshAnswer();
                 } else if (parsed.event === 'done') {
                     completed = true;
                 } else if (parsed.event === 'error') {
@@ -112,13 +278,16 @@ async function sendMessage(message) {
             if (done) break;
         }
 
+        renderMarkdown(answer, answerText);
         setStatus('', completed ? 'Resposta concluída' : 'Fluxo encerrado');
     } catch (error) {
         if (error.name === 'AbortError') {
-            if (!answer.textContent) answer.textContent = 'Resposta interrompida.';
+            if (!answerText) answerText = 'Resposta interrompida.';
+            renderMarkdown(answer, answerText);
             setStatus('', 'Interrompido');
         } else {
-            answer.textContent = answer.textContent || `Não consegui responder: ${error.message}`;
+            answerText = answerText || `Não consegui responder: ${error.message}`;
+            renderMarkdown(answer, answerText);
             setStatus('error', 'Falha na conexão');
         }
     } finally {
@@ -154,6 +323,20 @@ suggestions.addEventListener('click', event => {
     if (!button || activeRequest) return;
     input.value = button.dataset.prompt;
     form.requestSubmit();
+});
+
+messages.addEventListener('click', async event => {
+    const button = event.target.closest('.copy-code');
+    if (!button) return;
+    const code = button.closest('.code-block').querySelector('code').textContent;
+    try {
+        await navigator.clipboard.writeText(code);
+        button.textContent = 'Copiado!';
+        setTimeout(() => { button.textContent = 'Copiar'; }, 1600);
+    } catch {
+        button.textContent = 'Não foi possível copiar';
+        setTimeout(() => { button.textContent = 'Copiar'; }, 2000);
+    }
 });
 
 stopButton.addEventListener('click', () => activeRequest?.abort());

@@ -12,11 +12,16 @@ class HomePageTest {
     @Test
     void packagesChatInterfaceAtTheSpringBootWelcomePageLocation() throws Exception {
         var page = new ClassPathResource("static/index.html");
+        var script = new ClassPathResource("static/app.js");
 
         assertThat(page.exists()).isTrue();
         assertThat(page.getContentAsString(StandardCharsets.UTF_8))
                 .contains("ATLAS · Local AI Lab")
                 .contains("/styles.css")
                 .contains("/app.js");
+        assertThat(script.getContentAsString(StandardCharsets.UTF_8))
+                .contains("function renderMarkdown")
+                .contains("navigator.clipboard.writeText")
+                .contains("textContent = codeText");
     }
 }
