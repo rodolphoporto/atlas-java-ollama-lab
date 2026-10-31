@@ -46,6 +46,8 @@ mvn spring-boot:run
 
 A API inicia, por padrão, em `http://localhost:8080`.
 
+Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. Ela consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento.
+
 ## 3. Testar o endpoint
 
 ```bash
@@ -118,4 +120,5 @@ mvn clean verify
 ```
 
 Eles verificam o contrato HTTP, a validação, o mapeamento de erros, a requisição enviada à API do Ollama e a conversão do NDJSON do Ollama em eventos SSE.
+Também verificam que a interface web está disponível na raiz da aplicação.
 
