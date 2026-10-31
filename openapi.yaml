@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ATLAS-JAVA-001 API
-  version: 0.1.0
+  version: 0.2.0
   description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE.
 servers:
   - url: http://localhost:8080
@@ -32,7 +32,7 @@ paths:
       summary: Envia uma mensagem e transmite a resposta por Server-Sent Events
       operationId: streamChat
       description: |
-        Emite eventos `token` com fragmentos da resposta e termina com `done`.
+        Emite primeiro `conversation`, depois eventos `token` e termina com `done`.
         Depois que o streaming começa, falhas do Ollama são enviadas como evento `error`.
       requestBody:
         required: true
@@ -58,6 +58,23 @@ paths:
 
         '400':
           description: Mensagem ausente ou vazia
+  /api/conversations:
+    get:
+      summary: Lista conversas por atualização mais recente
+      responses:
+        '200':
+          description: Lista resumida de conversas
+  /api/conversations/{id}:
+    get:
+      summary: Recupera uma conversa e suas mensagens
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Conversa encontrada }
+        '404': { description: Conversa não encontrada }
 components:
   schemas:
     ChatRequest:
@@ -67,6 +84,9 @@ components:
         message:
           type: string
           minLength: 1
+        conversationId:
+          type: [string, 'null']
+          format: uuid
     ChatResponse:
       type: object
       required: [model, answer]

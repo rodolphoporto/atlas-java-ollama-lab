@@ -3,6 +3,7 @@ package br.com.atlaslab.api;
 import br.com.atlaslab.ollama.OllamaClient;
 import br.com.atlaslab.ollama.OllamaException;
 import br.com.atlaslab.ollama.OllamaProperties;
+import br.com.atlaslab.history.ConversationStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.web.client.RestClient;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -32,7 +34,7 @@ class ChatControllerTest {
     void setUp() {
         ollamaClient = new FakeOllamaClient();
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ChatController(ollamaClient, new ObjectMapper()))
+                .standaloneSetup(new ChatController(ollamaClient, new ObjectMapper(), new FakeConversationStore()))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }
@@ -79,6 +81,8 @@ class ChatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/event-stream"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "event: conversation\ndata: {\"conversationId\":\"11111111-1111-1111-1111-111111111111\"}\n\n")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "event: token\ndata: {\"model\":\"qwen3:4b-instruct\",\"content\":\"Olá\"}\n\n")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "event: done\ndata: {\"model\":\"qwen3:4b-instruct\",\"done\":true}\n\n")));
@@ -113,6 +117,19 @@ class ChatControllerTest {
                     new StreamChunk("qwen3:4b-instruct", "!", false),
                     new StreamChunk("qwen3:4b-instruct", "", true))
                     .forEach(onChunk);
+        }
+    }
+
+    private static final class FakeConversationStore implements ConversationStore {
+        private final UUID id = UUID.fromString("11111111-1111-1111-1111-111111111111");
+
+        @Override
+        public UUID appendUserMessage(UUID conversationId, String content) {
+            return conversationId == null ? id : conversationId;
+        }
+
+        @Override
+        public void appendAssistantMessage(UUID conversationId, String content) {
         }
     }
 }

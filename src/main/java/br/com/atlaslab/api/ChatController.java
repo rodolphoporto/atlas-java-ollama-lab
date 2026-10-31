@@ -2,6 +2,7 @@ package br.com.atlaslab.api;
 
 import br.com.atlaslab.ollama.OllamaClient;
 import br.com.atlaslab.ollama.OllamaException;
+import br.com.atlaslab.history.ConversationStore;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -22,10 +24,13 @@ public class ChatController {
 
     private final OllamaClient ollamaClient;
     private final ObjectMapper objectMapper;
+    private final ConversationStore conversationStore;
 
-    public ChatController(OllamaClient ollamaClient, ObjectMapper objectMapper) {
+    public ChatController(OllamaClient ollamaClient, ObjectMapper objectMapper,
+                          ConversationStore conversationStore) {
         this.ollamaClient = ollamaClient;
         this.objectMapper = objectMapper;
+        this.conversationStore = conversationStore;
     }
 
     @PostMapping("/chat")
@@ -36,12 +41,17 @@ public class ChatController {
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<StreamingResponseBody> stream(@Valid @RequestBody ChatRequest request) {
         StreamingResponseBody body = output -> {
+            UUID conversationId = conversationStore.appendUserMessage(request.conversationId(), request.message());
+            writeEvent(output, "conversation", new ConversationStarted(conversationId));
+            StringBuilder completeAnswer = new StringBuilder();
             try {
                 ollamaClient.streamChat(request.message(), chunk -> {
                     try {
                         if (chunk.done()) {
+                            conversationStore.appendAssistantMessage(conversationId, completeAnswer.toString());
                             writeEvent(output, "done", new StreamDone(chunk.model(), true));
                         } else if (chunk.content() != null && !chunk.content().isEmpty()) {
+                            completeAnswer.append(chunk.content());
                             writeEvent(output, "token", new StreamToken(chunk.model(), chunk.content()));
                         }
                     } catch (IOException exception) {
@@ -66,7 +76,8 @@ public class ChatController {
         output.flush();
     }
 
-    public record ChatRequest(@NotBlank(message = "message não pode estar vazio") String message) {
+    public record ChatRequest(@NotBlank(message = "message não pode estar vazio") String message,
+                              UUID conversationId) {
     }
 
     public record ChatResponse(String model, String answer) {
@@ -79,6 +90,9 @@ public class ChatController {
     }
 
     public record StreamError(String message) {
+    }
+
+    public record ConversationStarted(UUID conversationId) {
     }
 
     private static final class StreamWriteException extends RuntimeException {

@@ -24,7 +24,16 @@
             <span class="connection-dot" id="connectionDot"></span>
             <span id="connectionText">Pronto</span>
         </div>
+        <button class="history-toggle" id="historyButton" type="button">Histórico</button>
     </header>
+
+    <aside class="history-panel" id="historyPanel" aria-label="Histórico de conversas" hidden>
+        <div class="history-header">
+            <div><span class="label">CONVERSAS</span><strong>Seu histórico</strong></div>
+            <button id="newConversationButton" type="button">+ Nova</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+    </aside>
 
     <section class="hero">
         <p class="eyebrow">JAVA 21 · SPRING BOOT · OLLAMA</p>

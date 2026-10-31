@@ -7,8 +7,13 @@ const stopButton = document.querySelector('#stopButton');
 const clearButton = document.querySelector('#clearButton');
 const connection = document.querySelector('.connection');
 const connectionText = document.querySelector('#connectionText');
+const historyButton = document.querySelector('#historyButton');
+const historyPanel = document.querySelector('#historyPanel');
+const historyList = document.querySelector('#historyList');
+const newConversationButton = document.querySelector('#newConversationButton');
 
 let activeRequest = null;
+let activeConversationId = null;
 
 function setStatus(status, label) {
     connection.classList.toggle('busy', status === 'busy');
@@ -240,7 +245,7 @@ async function sendMessage(message) {
         const response = await fetch('/api/ai/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message }),
+            body: JSON.stringify({ message, conversationId: activeConversationId }),
             signal: activeRequest.signal
         });
 
@@ -268,6 +273,8 @@ async function sendMessage(message) {
                 if (parsed.event === 'token') {
                     answerText += payload.content || '';
                     refreshAnswer();
+                } else if (parsed.event === 'conversation') {
+                    activeConversationId = payload.conversationId;
                 } else if (parsed.event === 'done') {
                     completed = true;
                 } else if (parsed.event === 'error') {
@@ -279,6 +286,7 @@ async function sendMessage(message) {
         }
 
         renderMarkdown(answer, answerText);
+        await loadConversations();
         setStatus('', completed ? 'Resposta concluída' : 'Fluxo encerrado');
     } catch (error) {
         if (error.name === 'AbortError') {
@@ -347,5 +355,69 @@ clearButton.addEventListener('click', () => {
     addMessage('assistant', 'Conversa limpa. Em que posso ajudar agora?');
     setStatus('', 'Pronto');
 });
+
+function resetConversation() {
+    activeConversationId = null;
+    messages.replaceChildren();
+    addMessage('assistant', 'Nova conversa iniciada. O que vamos explorar?');
+    historyPanel.hidden = true;
+    setStatus('', 'Pronto');
+}
+
+async function loadConversations() {
+    try {
+        const response = await fetch('/api/conversations');
+        if (!response.ok) return;
+        const conversations = await response.json();
+        historyList.replaceChildren();
+        if (!conversations.length) {
+            const empty = document.createElement('p');
+            empty.className = 'history-empty';
+            empty.textContent = 'Nenhuma conversa salva ainda.';
+            historyList.append(empty);
+            return;
+        }
+        for (const conversation of conversations) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'history-item';
+            button.classList.toggle('active', conversation.id === activeConversationId);
+            button.dataset.id = conversation.id;
+            const title = document.createElement('strong');
+            title.textContent = conversation.title;
+            const date = document.createElement('small');
+            date.textContent = new Date(conversation.updatedAt).toLocaleString('pt-BR');
+            button.append(title, date);
+            historyList.append(button);
+        }
+    } catch {
+        historyList.textContent = 'Histórico indisponível.';
+    }
+}
+
+async function openConversation(id) {
+    const response = await fetch(`/api/conversations/${encodeURIComponent(id)}`);
+    if (!response.ok) return;
+    const conversation = await response.json();
+    activeConversationId = conversation.id;
+    messages.replaceChildren();
+    for (const message of conversation.messages) {
+        addMessage(message.role === 'USER' ? 'user' : 'assistant', message.content);
+    }
+    historyPanel.hidden = true;
+    setStatus('', 'Conversa carregada');
+}
+
+historyButton.addEventListener('click', async () => {
+    historyPanel.hidden = !historyPanel.hidden;
+    if (!historyPanel.hidden) await loadConversations();
+});
+
+historyList.addEventListener('click', event => {
+    const item = event.target.closest('[data-id]');
+    if (item && !activeRequest) openConversation(item.dataset.id);
+});
+
+newConversationButton.addEventListener('click', resetConversation);
 
 input.focus();

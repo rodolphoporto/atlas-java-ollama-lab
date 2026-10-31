@@ -8,6 +8,7 @@ Projeto de estudo com Java 21, Spring Boot 3.5 e Maven. Os endpoints enviam mens
 - Maven 3.6.3 ou superior
 - Acesso SSH ao computador `atlas`
 - Ollama ativo no `atlas`, com o modelo disponível
+- Docker Desktop para o PostgreSQL local
 
 No `atlas`, confirme ou instale o modelo:
 
@@ -36,6 +37,23 @@ Se o host, usuário ou porta SSH forem diferentes, ajuste apenas o comando do t�
 
 ## 2. Executar a aplicação
 
+Inicie primeiro o PostgreSQL do projeto:
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+Os dados ficam no volume `atlas-postgres-data`. Os valores locais podem ser substituídos com `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_PORT`; a aplicação aceita `DATABASE_URL`, `DATABASE_USER` e `DATABASE_PASSWORD`.
+
+Para encerrar apenas o contêiner, preservando o histórico:
+
+```bash
+docker compose down
+```
+
+Não use `docker compose down -v` a menos que queira apagar também o volume e todo o histórico local.
+
 ```bash
 cd /Users/esx/Documents/development/atlas-java-ollama-lab
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
@@ -46,7 +64,7 @@ mvn spring-boot:run
 
 A API inicia, por padrão, em `http://localhost:8080`.
 
-Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. Ela consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento. As respostas suportam um subconjunto seguro de Markdown — títulos, listas, citações, ênfase, links HTTP/HTTPS e blocos de código com botão para copiar. HTML produzido pelo modelo não é interpretado.
+Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. Ela consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento. O histórico de conversas fica persistido no PostgreSQL e pode ser reaberto pelo botão **Histórico**. As respostas suportam um subconjunto seguro de Markdown — títulos, listas, citações, ênfase, links HTTP/HTTPS e blocos de código com botão para copiar. HTML produzido pelo modelo não é interpretado.
 
 ## 3. Testar o endpoint
 
