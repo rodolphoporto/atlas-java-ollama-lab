@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -82,6 +83,37 @@ class OllamaClientTest {
                 new OllamaClient.StreamChunk("qwen3:4b-instruct", "Olá", false),
                 new OllamaClient.StreamChunk("qwen3:4b-instruct", "!", false),
                 new OllamaClient.StreamChunk("qwen3:4b-instruct", "", true));
+        server.verify();
+    }
+
+    @Test
+    void sendsConversationHistoryInOrder() {
+        server.expect(requestTo("http://127.0.0.1:11434/api/chat"))
+                .andExpect(content().json("""
+                        {
+                          "model": "qwen3:4b-instruct",
+                          "messages": [
+                            {"role": "user", "content": "Meu nome é Rodolpho"},
+                            {"role": "assistant", "content": "Prazer, Rodolpho!"},
+                            {"role": "user", "content": "Qual é meu nome?"}
+                          ],
+                          "stream": false
+                        }
+                        """))
+                .andRespond(withSuccess("""
+                        {
+                          "model": "qwen3:4b-instruct",
+                          "message": {"role": "assistant", "content": "Seu nome é Rodolpho."},
+                          "done": true
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        var response = client.chat(List.of(
+                new OllamaClient.ChatMessage("user", "Meu nome é Rodolpho"),
+                new OllamaClient.ChatMessage("assistant", "Prazer, Rodolpho!"),
+                new OllamaClient.ChatMessage("user", "Qual é meu nome?")));
+
+        assertThat(response.answer()).isEqualTo("Seu nome é Rodolpho.");
         server.verify();
     }
 }

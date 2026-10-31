@@ -29,12 +29,16 @@ public class OllamaClient {
     }
 
     public void streamChat(String prompt, Consumer<StreamChunk> onChunk) {
+        streamChat(List.of(new ChatMessage("user", prompt)), onChunk);
+    }
+
+    public void streamChat(List<ChatMessage> messages, Consumer<StreamChunk> onChunk) {
         try {
             restClient.post()
                     .uri("/api/chat")
                     .body(new OllamaRequest(
                             properties.model(),
-                            List.of(new Message("user", prompt)),
+                            messages,
                             true))
                     .exchange((request, response) -> {
                         HttpStatusCode status = response.getStatusCode();
@@ -66,12 +70,16 @@ public class OllamaClient {
     }
 
     public ChatResponse chat(String prompt) {
+        return chat(List.of(new ChatMessage("user", prompt)));
+    }
+
+    public ChatResponse chat(List<ChatMessage> messages) {
         try {
             OllamaResponse response = restClient.post()
                     .uri("/api/chat")
                     .body(new OllamaRequest(
                             properties.model(),
-                            List.of(new Message("user", prompt)),
+                            messages,
                             false))
                     .retrieve()
                     .body(OllamaResponse.class);
@@ -92,13 +100,13 @@ public class OllamaClient {
         }
     }
 
-    record OllamaRequest(String model, List<Message> messages, boolean stream) {
+    record OllamaRequest(String model, List<ChatMessage> messages, boolean stream) {
     }
 
-    record OllamaResponse(String model, Message message, boolean done) {
+    record OllamaResponse(String model, ChatMessage message, boolean done) {
     }
 
-    record Message(String role, String content) {
+    public record ChatMessage(String role, String content) {
     }
 
     public record StreamChunk(String model, String content, boolean done) {

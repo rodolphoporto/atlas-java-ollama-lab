@@ -29,12 +29,14 @@ class ChatControllerTest {
 
     private MockMvc mockMvc;
     private FakeOllamaClient ollamaClient;
+    private FakeConversationStore conversationStore;
 
     @BeforeEach
     void setUp() {
         ollamaClient = new FakeOllamaClient();
+        conversationStore = new FakeConversationStore();
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ChatController(ollamaClient, new ObjectMapper(), new FakeConversationStore()))
+                .standaloneSetup(new ChatController(ollamaClient, new ObjectMapper(), conversationStore))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }
@@ -46,7 +48,12 @@ class ChatControllerTest {
                         .content("{\"message\":\"Olá\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.model").value("qwen3:4b-instruct"))
-                .andExpect(jsonPath("$.answer").value("Olá!"));
+                .andExpect(jsonPath("$.answer").value("Olá!"))
+                .andExpect(jsonPath("$.conversationId").value("11111111-1111-1111-1111-111111111111"));
+
+        org.assertj.core.api.Assertions.assertThat(conversationStore.assistantAnswer).isEqualTo("Olá!");
+        org.assertj.core.api.Assertions.assertThat(ollamaClient.receivedMessages)
+                .containsExactly(new OllamaClient.ChatMessage("user", "Olá"));
     }
 
     @Test
@@ -103,25 +110,30 @@ class ChatControllerTest {
         }
 
         @Override
-        public ChatController.ChatResponse chat(String prompt) {
+        public ChatController.ChatResponse chat(List<ChatMessage> messages) {
             if (fail) {
                 throw new OllamaException("Ollama indisponível");
             }
+            receivedMessages = messages;
             return new ChatController.ChatResponse("qwen3:4b-instruct", "Olá!");
         }
 
         @Override
-        public void streamChat(String prompt, Consumer<StreamChunk> onChunk) {
+        public void streamChat(List<ChatMessage> messages, Consumer<StreamChunk> onChunk) {
+            receivedMessages = messages;
             List.of(
                     new StreamChunk("qwen3:4b-instruct", "Olá", false),
                     new StreamChunk("qwen3:4b-instruct", "!", false),
                     new StreamChunk("qwen3:4b-instruct", "", true))
                     .forEach(onChunk);
         }
+
+        private List<ChatMessage> receivedMessages;
     }
 
     private static final class FakeConversationStore implements ConversationStore {
         private final UUID id = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        private String assistantAnswer;
 
         @Override
         public UUID appendUserMessage(UUID conversationId, String content) {
@@ -130,6 +142,12 @@ class ChatControllerTest {
 
         @Override
         public void appendAssistantMessage(UUID conversationId, String content) {
+            assistantAnswer = content;
+        }
+
+        @Override
+        public List<ContextMessage> loadContext(UUID conversationId) {
+            return List.of(new ContextMessage("user", "Olá"));
         }
     }
 }

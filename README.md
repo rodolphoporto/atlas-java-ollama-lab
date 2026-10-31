@@ -64,7 +64,7 @@ mvn spring-boot:run
 
 A API inicia, por padrão, em `http://localhost:8080`.
 
-Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. Ela consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento. O histórico de conversas fica persistido no PostgreSQL e pode ser reaberto pelo botão **Histórico**. As respostas suportam um subconjunto seguro de Markdown — títulos, listas, citações, ênfase, links HTTP/HTTPS e blocos de código com botão para copiar. HTML produzido pelo modelo não é interpretado.
+Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. Ela consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento. O histórico de conversas fica persistido no PostgreSQL e pode ser reaberto pelo botão **Histórico**. Ao continuar uma conversa, uma janela recente desse histórico é enviada ao Ollama para que o modelo mantenha o contexto. As respostas suportam um subconjunto seguro de Markdown — títulos, listas, citações, ênfase, links HTTP/HTTPS e blocos de código com botão para copiar. HTML produzido pelo modelo não é interpretado.
 
 ## 3. Testar o endpoint
 
@@ -79,11 +79,20 @@ Resposta esperada:
 ```json
 {
   "model": "qwen3:4b-instruct",
-  "answer": "..."
+  "answer": "...",
+  "conversationId": "11111111-1111-1111-1111-111111111111"
 }
 ```
 
 Mensagem ausente ou vazia retorna HTTP 400. Falha de conexão, timeout ou erro HTTP do Ollama retorna HTTP 502 sem expor detalhes internos.
+
+Para continuar a mesma conversa e usar sua memória contextual, envie o `conversationId` retornado anteriormente:
+
+```bash
+curl -i http://localhost:8080/api/ai/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"Qual foi o assunto da minha pergunta anterior?","conversationId":"11111111-1111-1111-1111-111111111111"}'
+```
 
 ### Streaming SSE
 
@@ -120,6 +129,8 @@ Nenhum segredo é armazenado no projeto. As opções podem ser alteradas por var
 | `OLLAMA_MODEL` | `qwen3:4b-instruct` | Modelo usado no chat |
 | `OLLAMA_CONNECT_TIMEOUT` | `2s` | Timeout de conexão |
 | `OLLAMA_READ_TIMEOUT` | `120s` | Timeout de resposta |
+| `AI_CONTEXT_MAX_MESSAGES` | `20` | Máximo de mensagens recentes enviadas ao modelo |
+| `AI_CONTEXT_MAX_CHARACTERS` | `24000` | Orçamento total de caracteres do contexto |
 
 Exemplo:
 
@@ -137,6 +148,6 @@ export PATH="$JAVA_HOME/bin:$PATH"
 mvn clean verify
 ```
 
-Eles verificam o contrato HTTP, a validação, o mapeamento de erros, a requisição enviada à API do Ollama e a conversão do NDJSON do Ollama em eventos SSE.
+Eles verificam o contrato HTTP, a validação, o mapeamento de erros, a janela de memória contextual, a requisição enviada à API do Ollama e a conversão do NDJSON do Ollama em eventos SSE.
 Também verificam que a interface web está disponível na raiz da aplicação.
 

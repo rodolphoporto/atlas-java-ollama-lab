@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: ATLAS-JAVA-001 API
-  version: 0.2.0
-  description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE.
+  version: 0.3.0
+  description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE, com memória contextual persistida.
 servers:
   - url: http://localhost:8080
 paths:
@@ -10,6 +10,7 @@ paths:
     post:
       summary: Envia uma mensagem e aguarda a resposta completa
       operationId: chat
+      description: Cria ou continua uma conversa e envia ao modelo uma janela limitada do histórico.
       requestBody:
         required: true
         content:
@@ -25,6 +26,8 @@ paths:
                 $ref: '#/components/schemas/ChatResponse'
         '400':
           description: Mensagem ausente ou vazia
+        '404':
+          description: conversationId não encontrado
         '502':
           description: Falha antes de concluir a chamada ao Ollama
   /api/ai/chat/stream:
@@ -50,6 +53,9 @@ paths:
               examples:
                 tokens:
                   value: |
+                    event: conversation
+                    data: {"conversationId":"11111111-1111-1111-1111-111111111111"}
+
                     event: token
                     data: {"model":"qwen3:4b-instruct","content":"Olá"}
 
@@ -58,6 +64,8 @@ paths:
 
         '400':
           description: Mensagem ausente ou vazia
+        '404':
+          description: conversationId não encontrado
   /api/conversations:
     get:
       summary: Lista conversas por atualização mais recente
@@ -84,14 +92,18 @@ components:
         message:
           type: string
           minLength: 1
+          maxLength: 8000
         conversationId:
           type: [string, 'null']
           format: uuid
     ChatResponse:
       type: object
-      required: [model, answer]
+      required: [model, answer, conversationId]
       properties:
         model:
           type: string
         answer:
           type: string
+        conversationId:
+          type: string
+          format: uuid

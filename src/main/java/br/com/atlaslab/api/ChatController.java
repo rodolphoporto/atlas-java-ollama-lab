@@ -5,6 +5,7 @@ import br.com.atlaslab.ollama.OllamaException;
 import br.com.atlaslab.history.ConversationStore;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -35,7 +37,10 @@ public class ChatController {
 
     @PostMapping("/chat")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request) {
-        return ollamaClient.chat(request.message());
+        UUID conversationId = conversationStore.appendUserMessage(request.conversationId(), request.message());
+        ChatResponse response = ollamaClient.chat(context(conversationId));
+        conversationStore.appendAssistantMessage(conversationId, response.answer());
+        return new ChatResponse(response.model(), response.answer(), conversationId);
     }
 
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -45,7 +50,7 @@ public class ChatController {
             writeEvent(output, "conversation", new ConversationStarted(conversationId));
             StringBuilder completeAnswer = new StringBuilder();
             try {
-                ollamaClient.streamChat(request.message(), chunk -> {
+                ollamaClient.streamChat(context(conversationId), chunk -> {
                     try {
                         if (chunk.done()) {
                             conversationStore.appendAssistantMessage(conversationId, completeAnswer.toString());
@@ -76,11 +81,21 @@ public class ChatController {
         output.flush();
     }
 
-    public record ChatRequest(@NotBlank(message = "message não pode estar vazio") String message,
+    private List<OllamaClient.ChatMessage> context(UUID conversationId) {
+        return conversationStore.loadContext(conversationId).stream()
+                .map(message -> new OllamaClient.ChatMessage(message.role(), message.content()))
+                .toList();
+    }
+
+    public record ChatRequest(@NotBlank(message = "message não pode estar vazio")
+                              @Size(max = 8000, message = "message deve ter no máximo 8000 caracteres") String message,
                               UUID conversationId) {
     }
 
-    public record ChatResponse(String model, String answer) {
+    public record ChatResponse(String model, String answer, UUID conversationId) {
+        public ChatResponse(String model, String answer) {
+            this(model, answer, null);
+        }
     }
 
     public record StreamToken(String model, String content) {
