@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: atlas-java-ollama-lab
+
+app:
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}
+    model: ${OLLAMA_MODEL:qwen3:4b-instruct}
+    connect-timeout: ${OLLAMA_CONNECT_TIMEOUT:2s}
+    read-timeout: ${OLLAMA_READ_TIMEOUT:120s}
+
