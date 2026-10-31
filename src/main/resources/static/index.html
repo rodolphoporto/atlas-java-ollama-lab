@@ -35,6 +35,35 @@
         <div class="history-list" id="historyList"></div>
     </aside>
 
+    <dialog class="management-dialog" id="renameDialog">
+        <form id="renameForm">
+            <div class="dialog-heading">
+                <span class="label">RENOMEAR CONVERSA</span>
+                <strong>Escolha um título fácil de encontrar</strong>
+            </div>
+            <label for="renameInput">Título</label>
+            <input id="renameInput" name="title" maxlength="100" autocomplete="off" required>
+            <p class="dialog-error" id="renameError" role="alert" hidden></p>
+            <div class="dialog-actions">
+                <button class="dialog-cancel" id="cancelRenameButton" type="button">Cancelar</button>
+                <button class="dialog-primary" type="submit">Salvar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="management-dialog danger-dialog" id="deleteDialog">
+        <div class="dialog-heading">
+            <span class="label">EXCLUIR CONVERSA</span>
+            <strong>Esta ação não pode ser desfeita</strong>
+        </div>
+        <p>Deseja excluir <strong id="deleteConversationTitle"></strong> e todas as suas mensagens?</p>
+        <p class="dialog-error" id="deleteError" role="alert" hidden></p>
+        <div class="dialog-actions">
+            <button class="dialog-cancel" id="cancelDeleteButton" type="button">Cancelar</button>
+            <button class="dialog-danger" id="confirmDeleteButton" type="button">Excluir definitivamente</button>
+        </div>
+    </dialog>
+
     <section class="hero">
         <p class="eyebrow">JAVA 21 · SPRING BOOT · OLLAMA</p>
         <h1>Converse com a IA<br><span>rodando no seu ATLAS.</span></h1>
@@ -81,7 +110,7 @@
     </section>
 
     <footer>
-        <span>ATLAS-JAVA-003</span>
+        <span>ATLAS-JAVA-007</span>
         <span>Processamento local via túnel SSH</span>
     </footer>
 </main>

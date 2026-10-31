@@ -11,9 +11,20 @@ const historyButton = document.querySelector('#historyButton');
 const historyPanel = document.querySelector('#historyPanel');
 const historyList = document.querySelector('#historyList');
 const newConversationButton = document.querySelector('#newConversationButton');
+const renameDialog = document.querySelector('#renameDialog');
+const renameForm = document.querySelector('#renameForm');
+const renameInput = document.querySelector('#renameInput');
+const renameError = document.querySelector('#renameError');
+const cancelRenameButton = document.querySelector('#cancelRenameButton');
+const deleteDialog = document.querySelector('#deleteDialog');
+const deleteConversationTitle = document.querySelector('#deleteConversationTitle');
+const deleteError = document.querySelector('#deleteError');
+const cancelDeleteButton = document.querySelector('#cancelDeleteButton');
+const confirmDeleteButton = document.querySelector('#confirmDeleteButton');
 
 let activeRequest = null;
 let activeConversationId = null;
+let managedConversationId = null;
 
 function setStatus(status, label) {
     connection.classList.toggle('busy', status === 'busy');
@@ -378,17 +389,41 @@ async function loadConversations() {
             return;
         }
         for (const conversation of conversations) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'history-item';
-            button.classList.toggle('active', conversation.id === activeConversationId);
-            button.dataset.id = conversation.id;
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.classList.toggle('active', conversation.id === activeConversationId);
+
+            const open = document.createElement('button');
+            open.type = 'button';
+            open.className = 'history-open';
+            open.dataset.action = 'open';
+            open.dataset.id = conversation.id;
             const title = document.createElement('strong');
             title.textContent = conversation.title;
             const date = document.createElement('small');
             date.textContent = new Date(conversation.updatedAt).toLocaleString('pt-BR');
-            button.append(title, date);
-            historyList.append(button);
+            open.append(title, date);
+
+            const actions = document.createElement('div');
+            actions.className = 'history-actions';
+            const rename = document.createElement('button');
+            rename.type = 'button';
+            rename.dataset.action = 'rename';
+            rename.dataset.id = conversation.id;
+            rename.dataset.title = conversation.title;
+            rename.textContent = 'Renomear';
+            rename.setAttribute('aria-label', `Renomear ${conversation.title}`);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'danger-action';
+            remove.dataset.action = 'delete';
+            remove.dataset.id = conversation.id;
+            remove.dataset.title = conversation.title;
+            remove.textContent = 'Excluir';
+            remove.setAttribute('aria-label', `Excluir ${conversation.title}`);
+            actions.append(rename, remove);
+            item.append(open, actions);
+            historyList.append(item);
         }
     } catch {
         historyList.textContent = 'Histórico indisponível.';
@@ -413,9 +448,88 @@ historyButton.addEventListener('click', async () => {
     if (!historyPanel.hidden) await loadConversations();
 });
 
+function showRenameDialog(id, title) {
+    managedConversationId = id;
+    renameInput.value = title;
+    renameError.hidden = true;
+    renameDialog.showModal();
+    renameInput.select();
+}
+
+function showDeleteDialog(id, title) {
+    managedConversationId = id;
+    deleteConversationTitle.textContent = `“${title}”`;
+    deleteError.hidden = true;
+    deleteDialog.showModal();
+}
+
 historyList.addEventListener('click', event => {
-    const item = event.target.closest('[data-id]');
-    if (item && !activeRequest) openConversation(item.dataset.id);
+    const action = event.target.closest('[data-action]');
+    if (!action || activeRequest) return;
+    if (action.dataset.action === 'open') openConversation(action.dataset.id);
+    if (action.dataset.action === 'rename') showRenameDialog(action.dataset.id, action.dataset.title);
+    if (action.dataset.action === 'delete') showDeleteDialog(action.dataset.id, action.dataset.title);
+});
+
+renameForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const title = renameInput.value.trim();
+    if (!title || !managedConversationId) return;
+    renameError.hidden = true;
+    try {
+        const response = await fetch(`/api/conversations/${encodeURIComponent(managedConversationId)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title })
+        });
+        if (!response.ok) {
+            const problem = await response.json().catch(() => ({}));
+            throw new Error(problem.detail || `Falha HTTP ${response.status}`);
+        }
+        renameDialog.close();
+        managedConversationId = null;
+        await loadConversations();
+        setStatus('', 'Conversa renomeada');
+    } catch (error) {
+        renameError.textContent = error.message;
+        renameError.hidden = false;
+    }
+});
+
+confirmDeleteButton.addEventListener('click', async () => {
+    if (!managedConversationId) return;
+    deleteError.hidden = true;
+    confirmDeleteButton.disabled = true;
+    const deletedId = managedConversationId;
+    try {
+        const response = await fetch(`/api/conversations/${encodeURIComponent(deletedId)}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const problem = await response.json().catch(() => ({}));
+            throw new Error(problem.detail || `Falha HTTP ${response.status}`);
+        }
+        deleteDialog.close();
+        managedConversationId = null;
+        if (activeConversationId === deletedId) resetConversation();
+        await loadConversations();
+        setStatus('', 'Conversa excluída');
+    } catch (error) {
+        deleteError.textContent = error.message;
+        deleteError.hidden = false;
+    } finally {
+        confirmDeleteButton.disabled = false;
+    }
+});
+
+cancelRenameButton.addEventListener('click', () => {
+    renameDialog.close();
+    managedConversationId = null;
+});
+
+cancelDeleteButton.addEventListener('click', () => {
+    deleteDialog.close();
+    managedConversationId = null;
 });
 
 newConversationButton.addEventListener('click', resetConversation);

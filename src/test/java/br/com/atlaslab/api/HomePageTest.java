@@ -17,11 +17,15 @@ class HomePageTest {
         assertThat(page.exists()).isTrue();
         assertThat(page.getContentAsString(StandardCharsets.UTF_8))
                 .contains("ATLAS · Local AI Lab")
+                .contains("renameDialog")
+                .contains("deleteDialog")
                 .contains("/styles.css")
                 .contains("/app.js");
         assertThat(script.getContentAsString(StandardCharsets.UTF_8))
                 .contains("function renderMarkdown")
                 .contains("navigator.clipboard.writeText")
+                .contains("method: 'PATCH'")
+                .contains("method: 'DELETE'")
                 .contains("textContent = codeText");
     }
 }

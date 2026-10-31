@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: ATLAS-JAVA-001 API
-  version: 0.3.0
-  description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE, com memória contextual persistida.
+  version: 0.4.0
+  description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE, com memória contextual e gerenciamento de conversas.
 servers:
   - url: http://localhost:8080
 paths:
@@ -83,6 +83,40 @@ paths:
       responses:
         '200': { description: Conversa encontrada }
         '404': { description: Conversa não encontrada }
+    patch:
+      summary: Renomeia uma conversa
+      operationId: renameConversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameConversationRequest'
+      responses:
+        '200':
+          description: Conversa renomeada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationSummary'
+        '400': { description: Título ausente, vazio ou maior que 100 caracteres }
+        '404': { description: Conversa não encontrada }
+    delete:
+      summary: Exclui uma conversa e todas as suas mensagens
+      operationId: deleteConversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Conversa excluída }
+        '404': { description: Conversa não encontrada }
 components:
   schemas:
     ChatRequest:
@@ -107,3 +141,23 @@ components:
         conversationId:
           type: string
           format: uuid
+    RenameConversationRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+    ConversationSummary:
+      type: object
+      required: [id, title, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time

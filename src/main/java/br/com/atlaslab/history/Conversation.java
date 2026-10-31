@@ -41,6 +41,11 @@ class Conversation {
         updatedAt = Instant.now();
     }
 
+    void rename(String title) {
+        this.title = title.trim();
+        this.updatedAt = Instant.now();
+    }
+
     UUID id() { return id; }
     String title() { return title; }
     Instant createdAt() { return createdAt; }

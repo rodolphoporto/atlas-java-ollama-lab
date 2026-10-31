@@ -88,6 +88,19 @@ public class ConversationService implements ConversationStore {
                         .toList());
     }
 
+    @Transactional
+    public ConversationSummary rename(UUID id, String title) {
+        Conversation conversation = find(id);
+        conversation.rename(title);
+        Conversation saved = repository.save(conversation);
+        return new ConversationSummary(saved.id(), saved.title(), saved.updatedAt());
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        repository.delete(find(id));
+    }
+
     private Conversation find(UUID id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversa não encontrada"));

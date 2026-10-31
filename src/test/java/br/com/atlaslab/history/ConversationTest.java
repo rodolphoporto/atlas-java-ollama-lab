@@ -26,4 +26,13 @@ class ConversationTest {
 
         assertThat(conversation.title()).hasSize(60).endsWith("...");
     }
+
+    @Test
+    void renamesConversationAndTrimsWhitespace() {
+        var conversation = new Conversation("Título original");
+
+        conversation.rename("  Novo título  ");
+
+        assertThat(conversation.title()).isEqualTo("Novo título");
+    }
 }
