@@ -48,14 +48,20 @@ class OllamaClientTest {
                         {
                           "model": "qwen3:4b-instruct",
                           "message": {"role": "assistant", "content": "Java é uma linguagem multiplataforma."},
-                          "done": true
+                          "done": true,
+                          "total_duration": 1250000000,
+                          "prompt_eval_count": 18,
+                          "eval_count": 12,
+                          "eval_duration": 120000000
                         }
                         """, MediaType.APPLICATION_JSON));
 
         var response = client.chat("Explique Java em uma frase");
 
         assertThat(response.model()).isEqualTo("qwen3:4b-instruct");
-        assertThat(response.answer()).isEqualTo("Java é uma linguagem multiplataforma.");
+        assertThat(response.content()).isEqualTo("Java é uma linguagem multiplataforma.");
+        assertThat(response.stats()).isEqualTo(
+                new OllamaClient.OllamaStats(1_250_000_000L, 18, 12, 120_000_000L));
         server.verify();
     }
 
@@ -72,7 +78,7 @@ class OllamaClientTest {
                 .andRespond(withSuccess("""
                         {"model":"qwen3:4b-instruct","message":{"role":"assistant","content":"Olá"},"done":false}
                         {"model":"qwen3:4b-instruct","message":{"role":"assistant","content":"!"},"done":false}
-                        {"model":"qwen3:4b-instruct","message":{"role":"assistant","content":""},"done":true}
+                        {"model":"qwen3:4b-instruct","message":{"role":"assistant","content":""},"done":true,"total_duration":1250000000,"prompt_eval_count":18,"eval_count":12,"eval_duration":120000000}
                         """, MediaType.APPLICATION_NDJSON));
 
         var chunks = new ArrayList<OllamaClient.StreamChunk>();
@@ -82,7 +88,8 @@ class OllamaClientTest {
         assertThat(chunks).containsExactly(
                 new OllamaClient.StreamChunk("qwen3:4b-instruct", "Olá", false),
                 new OllamaClient.StreamChunk("qwen3:4b-instruct", "!", false),
-                new OllamaClient.StreamChunk("qwen3:4b-instruct", "", true));
+                new OllamaClient.StreamChunk("qwen3:4b-instruct", "", true,
+                        new OllamaClient.OllamaStats(1_250_000_000L, 18, 12, 120_000_000L)));
         server.verify();
     }
 
@@ -113,7 +120,7 @@ class OllamaClientTest {
                 new OllamaClient.ChatMessage("assistant", "Prazer, Rodolpho!"),
                 new OllamaClient.ChatMessage("user", "Qual é meu nome?")));
 
-        assertThat(response.answer()).isEqualTo("Seu nome é Rodolpho.");
+        assertThat(response.content()).isEqualTo("Seu nome é Rodolpho.");
         server.verify();
     }
 }

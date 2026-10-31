@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: ATLAS-JAVA-001 API
-  version: 0.4.0
-  description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE, com memória contextual e gerenciamento de conversas.
+  version: 0.5.0
+  description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE, com memória contextual, gerenciamento e métricas de inferência.
 servers:
   - url: http://localhost:8080
 paths:
@@ -60,7 +60,7 @@ paths:
                     data: {"model":"qwen3:4b-instruct","content":"Olá"}
 
                     event: done
-                    data: {"model":"qwen3:4b-instruct","done":true}
+                    data: {"model":"qwen3:4b-instruct","done":true,"metrics":{"timeToFirstTokenMs":95,"totalDurationMs":1180,"tokensPerSecond":103.5,"promptTokens":42,"completionTokens":122,"contextMessages":3,"contextCharacters":286}}
 
         '400':
           description: Mensagem ausente ou vazia
@@ -132,7 +132,7 @@ components:
           format: uuid
     ChatResponse:
       type: object
-      required: [model, answer, conversationId]
+      required: [model, answer, conversationId, metrics]
       properties:
         model:
           type: string
@@ -141,6 +141,32 @@ components:
         conversationId:
           type: string
           format: uuid
+        metrics:
+          $ref: '#/components/schemas/InferenceMetrics'
+    InferenceMetrics:
+      type: object
+      required: [timeToFirstTokenMs, totalDurationMs, tokensPerSecond, promptTokens, completionTokens, contextMessages, contextCharacters]
+      properties:
+        timeToFirstTokenMs:
+          description: Tempo percebido até o primeiro fragmento no streaming; nulo na resposta não streaming.
+          type: [integer, 'null']
+          format: int64
+        totalDurationMs:
+          description: Duração ponta a ponta medida pela aplicação.
+          type: integer
+          format: int64
+        tokensPerSecond:
+          description: Velocidade de geração calculada com eval_count e eval_duration do Ollama.
+          type: [number, 'null']
+          format: double
+        promptTokens:
+          type: [integer, 'null']
+        completionTokens:
+          type: [integer, 'null']
+        contextMessages:
+          type: integer
+        contextCharacters:
+          type: integer
     RenameConversationRequest:
       type: object
       required: [title]

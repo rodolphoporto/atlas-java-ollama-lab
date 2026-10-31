@@ -1,6 +1,6 @@
 # ATLAS-JAVA-001 — Java, Spring Boot e Ollama
 
-Projeto de estudo com Java 21, Spring Boot 3.5 e Maven. Os endpoints enviam mensagens ao Ollama pela API HTTP usando o `RestClient` do Spring, com resposta completa ou streaming SSE.
+Projeto de estudo com Java 21, Spring Boot 3.5 e Maven. Os endpoints enviam mensagens ao Ollama pela API HTTP usando o `RestClient` do Spring, com resposta completa ou streaming SSE e métricas de inferência.
 
 ## Pré-requisitos
 
@@ -64,7 +64,7 @@ mvn spring-boot:run
 
 A API inicia, por padrão, em `http://localhost:8080`.
 
-Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. Ela consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento. O histórico de conversas fica persistido no PostgreSQL e pode ser reaberto, renomeado ou excluído pelo botão **Histórico**. A exclusão exige confirmação e remove também as mensagens da conversa. Ao continuar uma conversa, uma janela recente desse histórico é enviada ao Ollama para que o modelo mantenha o contexto. As respostas suportam um subconjunto seguro de Markdown — títulos, listas, citações, ênfase, links HTTP/HTTPS e blocos de código com botão para copiar. HTML produzido pelo modelo não é interpretado.
+Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. Ela consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento. Ao final de cada nova resposta, exibe tempo até o primeiro token, duração total, tokens por segundo, tokens de entrada/saída e tamanho do contexto. O histórico de conversas fica persistido no PostgreSQL e pode ser reaberto, renomeado ou excluído pelo botão **Histórico**. A exclusão exige confirmação e remove também as mensagens da conversa. Ao continuar uma conversa, uma janela recente desse histórico é enviada ao Ollama para que o modelo mantenha o contexto. As respostas suportam um subconjunto seguro de Markdown — títulos, listas, citações, ênfase, links HTTP/HTTPS e blocos de código com botão para copiar. HTML produzido pelo modelo não é interpretado.
 
 ## 3. Testar o endpoint
 
@@ -80,7 +80,16 @@ Resposta esperada:
 {
   "model": "qwen3:4b-instruct",
   "answer": "...",
-  "conversationId": "11111111-1111-1111-1111-111111111111"
+  "conversationId": "11111111-1111-1111-1111-111111111111",
+  "metrics": {
+    "timeToFirstTokenMs": null,
+    "totalDurationMs": 1180,
+    "tokensPerSecond": 103.5,
+    "promptTokens": 42,
+    "completionTokens": 122,
+    "contextMessages": 1,
+    "contextCharacters": 61
+  }
 }
 ```
 
@@ -118,6 +127,22 @@ data: {"model":"qwen3:4b-instruct","done":true}
 ```
 
 Se o Ollama falhar depois que o HTTP 200 e o fluxo SSE já começaram, a API envia `event: error` com uma mensagem segura e encerra a conexão. O contrato completo está em [`openapi.yaml`](openapi.yaml).
+
+### Métricas de inferência
+
+O evento SSE `done` e a resposta completa incluem:
+
+| Campo | Origem |
+|---|---|
+| `timeToFirstTokenMs` | Tempo medido pela aplicação até o primeiro fragmento do streaming |
+| `totalDurationMs` | Duração ponta a ponta medida pela aplicação |
+| `tokensPerSecond` | `eval_count / eval_duration` informado pelo Ollama |
+| `promptTokens` | Tokens de entrada informados pelo Ollama |
+| `completionTokens` | Tokens gerados informados pelo Ollama |
+| `contextMessages` | Quantidade de mensagens enviadas ao modelo |
+| `contextCharacters` | Tamanho textual do contexto enviado |
+
+As métricas aparecem somente nas respostas geradas durante a sessão atual; não são persistidas no histórico.
 
 ### Gerenciar conversas
 
@@ -166,6 +191,6 @@ export PATH="$JAVA_HOME/bin:$PATH"
 mvn clean verify
 ```
 
-Eles verificam o contrato HTTP, a validação, o gerenciamento de conversas, o mapeamento de erros, a janela de memória contextual, a requisição enviada à API do Ollama e a conversão do NDJSON do Ollama em eventos SSE.
+Eles verificam o contrato HTTP, a validação, o gerenciamento de conversas, as métricas de inferência, o mapeamento de erros, a janela de memória contextual, a requisição enviada à API do Ollama e a conversão do NDJSON do Ollama em eventos SSE.
 Também verificam que a interface web está disponível na raiz da aplicação.
 

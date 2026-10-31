@@ -220,6 +220,43 @@ function addMessage(role, text = '') {
     return content;
 }
 
+function formatDuration(milliseconds) {
+    if (milliseconds < 1000) return `${milliseconds} ms`;
+    return `${(milliseconds / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} s`;
+}
+
+function renderMetrics(answer, metrics) {
+    answer.parentElement.querySelector('.inference-metrics')?.remove();
+    if (!metrics) return;
+
+    const panel = document.createElement('div');
+    panel.className = 'inference-metrics';
+    panel.setAttribute('aria-label', 'Métricas da inferência');
+
+    const entries = [];
+    if (metrics.timeToFirstTokenMs !== null) {
+        entries.push(['1º token', formatDuration(metrics.timeToFirstTokenMs)]);
+    }
+    entries.push(['Total', formatDuration(metrics.totalDurationMs)]);
+    if (metrics.tokensPerSecond !== null) {
+        entries.push(['Velocidade', `${metrics.tokensPerSecond.toLocaleString('pt-BR')} tok/s`]);
+    }
+    if (metrics.promptTokens !== null) entries.push(['Entrada', `${metrics.promptTokens} tokens`]);
+    if (metrics.completionTokens !== null) entries.push(['Saída', `${metrics.completionTokens} tokens`]);
+    entries.push(['Contexto', `${metrics.contextMessages} msgs · ${metrics.contextCharacters} chars`]);
+
+    for (const [label, value] of entries) {
+        const metric = document.createElement('span');
+        const name = document.createElement('small');
+        name.textContent = label;
+        const result = document.createElement('strong');
+        result.textContent = value;
+        metric.append(name, result);
+        panel.append(metric);
+    }
+    answer.parentElement.append(panel);
+}
+
 function parseEvent(block) {
     let event = 'message';
     const data = [];
@@ -288,6 +325,7 @@ async function sendMessage(message) {
                     activeConversationId = payload.conversationId;
                 } else if (parsed.event === 'done') {
                     completed = true;
+                    renderMetrics(answer, payload.metrics);
                 } else if (parsed.event === 'error') {
                     throw new Error(payload.message || 'O streaming foi interrompido.');
                 }

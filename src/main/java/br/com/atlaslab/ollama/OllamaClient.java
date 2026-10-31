@@ -1,6 +1,6 @@
 package br.com.atlaslab.ollama;
 
-import br.com.atlaslab.api.ChatController.ChatResponse;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
@@ -55,7 +55,7 @@ public class OllamaClient {
                                 }
                                 OllamaResponse chunk = objectMapper.readValue(line, OllamaResponse.class);
                                 String content = chunk.message() == null ? null : chunk.message().content();
-                                onChunk.accept(new StreamChunk(chunk.model(), content, chunk.done()));
+                                onChunk.accept(new StreamChunk(chunk.model(), content, chunk.done(), chunk.stats()));
                             }
                         } catch (IOException exception) {
                             throw new OllamaException("Falha ao ler o streaming retornado pelo Ollama.", exception);
@@ -69,11 +69,11 @@ public class OllamaClient {
         }
     }
 
-    public ChatResponse chat(String prompt) {
+    public ChatResult chat(String prompt) {
         return chat(List.of(new ChatMessage("user", prompt)));
     }
 
-    public ChatResponse chat(List<ChatMessage> messages) {
+    public ChatResult chat(List<ChatMessage> messages) {
         try {
             OllamaResponse response = restClient.post()
                     .uri("/api/chat")
@@ -88,7 +88,7 @@ public class OllamaClient {
                 throw new OllamaException("O Ollama retornou uma resposta vazia.");
             }
 
-            return new ChatResponse(response.model(), response.message().content());
+            return new ChatResult(response.model(), response.message().content(), response.stats());
         } catch (RestClientResponseException exception) {
             throw new OllamaException(
                     "O Ollama respondeu com HTTP " + exception.getStatusCode().value() + ".",
@@ -103,13 +103,38 @@ public class OllamaClient {
     record OllamaRequest(String model, List<ChatMessage> messages, boolean stream) {
     }
 
-    record OllamaResponse(String model, ChatMessage message, boolean done) {
+    record OllamaResponse(
+            String model,
+            ChatMessage message,
+            boolean done,
+            @JsonProperty("total_duration") Long totalDurationNanos,
+            @JsonProperty("prompt_eval_count") Integer promptTokens,
+            @JsonProperty("eval_count") Integer completionTokens,
+            @JsonProperty("eval_duration") Long evalDurationNanos) {
+
+        OllamaStats stats() {
+            if (totalDurationNanos == null && promptTokens == null
+                    && completionTokens == null && evalDurationNanos == null) {
+                return null;
+            }
+            return new OllamaStats(totalDurationNanos, promptTokens, completionTokens, evalDurationNanos);
+        }
     }
 
     public record ChatMessage(String role, String content) {
     }
 
-    public record StreamChunk(String model, String content, boolean done) {
+    public record ChatResult(String model, String content, OllamaStats stats) {
+    }
+
+    public record OllamaStats(Long totalDurationNanos, Integer promptTokens,
+                              Integer completionTokens, Long evalDurationNanos) {
+    }
+
+    public record StreamChunk(String model, String content, boolean done, OllamaStats stats) {
+        public StreamChunk(String model, String content, boolean done) {
+            this(model, content, done, null);
+        }
     }
 }
 

@@ -24,6 +24,8 @@ class HomePageTest {
         assertThat(script.getContentAsString(StandardCharsets.UTF_8))
                 .contains("function renderMarkdown")
                 .contains("navigator.clipboard.writeText")
+                .contains("function renderMetrics")
+                .contains("timeToFirstTokenMs")
                 .contains("method: 'PATCH'")
                 .contains("method: 'DELETE'")
                 .contains("textContent = codeText");

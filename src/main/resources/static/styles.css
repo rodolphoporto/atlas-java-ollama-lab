@@ -189,6 +189,10 @@ button { color: inherit; }
 .code-block pre { margin: 0; padding: 15px; overflow-x: auto; }
 .code-block pre code { color: #d9ede6; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; white-space: pre; tab-size: 4; }
 .cursor::after { content: ""; display: inline-block; width: 6px; height: 15px; margin-left: 3px; vertical-align: -2px; background: var(--accent); animation: blink 0.7s infinite; }
+.inference-metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(178, 224, 207, .1); }
+.inference-metrics > span { display: inline-flex; align-items: baseline; gap: 4px; padding: 4px 7px; border: 1px solid rgba(103, 245, 189, .1); border-radius: 7px; background: rgba(103, 245, 189, .045); }
+.inference-metrics small { color: #718d84; font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
+.inference-metrics strong { color: #addfcd; font: 9px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 
 .suggestions { display: flex; gap: 8px; padding: 0 22px 14px; overflow-x: auto; }
 .suggestions button {
@@ -233,6 +237,7 @@ footer { padding: 18px 4px 0; color: #536a62; font-size: 9px; letter-spacing: 0.
     .chat-toolbar, .suggestions { padding-inline: 14px; }
     .shortcut { display: none; }
     .history-actions { opacity: 1; }
+    .inference-metrics { gap: 5px; }
     footer { flex-direction: column; gap: 5px; align-items: flex-start; }
 }
 

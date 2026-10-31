@@ -49,7 +49,12 @@ class ChatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.model").value("qwen3:4b-instruct"))
                 .andExpect(jsonPath("$.answer").value("Olá!"))
-                .andExpect(jsonPath("$.conversationId").value("11111111-1111-1111-1111-111111111111"));
+                .andExpect(jsonPath("$.conversationId").value("11111111-1111-1111-1111-111111111111"))
+                .andExpect(jsonPath("$.metrics.tokensPerSecond").value(100.0))
+                .andExpect(jsonPath("$.metrics.promptTokens").value(3))
+                .andExpect(jsonPath("$.metrics.completionTokens").value(2))
+                .andExpect(jsonPath("$.metrics.contextMessages").value(1))
+                .andExpect(jsonPath("$.metrics.contextCharacters").value(3));
 
         org.assertj.core.api.Assertions.assertThat(conversationStore.assistantAnswer).isEqualTo("Olá!");
         org.assertj.core.api.Assertions.assertThat(ollamaClient.receivedMessages)
@@ -91,8 +96,10 @@ class ChatControllerTest {
                         "event: conversation\ndata: {\"conversationId\":\"11111111-1111-1111-1111-111111111111\"}\n\n")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "event: token\ndata: {\"model\":\"qwen3:4b-instruct\",\"content\":\"Olá\"}\n\n")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "event: done\ndata: {\"model\":\"qwen3:4b-instruct\",\"done\":true}\n\n")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event: done")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"tokensPerSecond\":100.0")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"promptTokens\":3")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"completionTokens\":2")));
     }
 
     private static final class FakeOllamaClient extends OllamaClient {
@@ -110,12 +117,13 @@ class ChatControllerTest {
         }
 
         @Override
-        public ChatController.ChatResponse chat(List<ChatMessage> messages) {
+        public ChatResult chat(List<ChatMessage> messages) {
             if (fail) {
                 throw new OllamaException("Ollama indisponível");
             }
             receivedMessages = messages;
-            return new ChatController.ChatResponse("qwen3:4b-instruct", "Olá!");
+            return new ChatResult("qwen3:4b-instruct", "Olá!",
+                    new OllamaStats(30_000_000L, 3, 2, 20_000_000L));
         }
 
         @Override
@@ -124,7 +132,8 @@ class ChatControllerTest {
             List.of(
                     new StreamChunk("qwen3:4b-instruct", "Olá", false),
                     new StreamChunk("qwen3:4b-instruct", "!", false),
-                    new StreamChunk("qwen3:4b-instruct", "", true))
+                    new StreamChunk("qwen3:4b-instruct", "", true,
+                            new OllamaStats(30_000_000L, 3, 2, 20_000_000L)))
                     .forEach(onChunk);
         }
 
