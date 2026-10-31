@@ -26,6 +26,7 @@ class HomePageTest {
                 .contains("navigator.clipboard.writeText")
                 .contains("function renderMetrics")
                 .contains("timeToFirstTokenMs")
+                .contains("metrics.contextMessages === 1 ? 'msg' : 'msgs'")
                 .contains("method: 'PATCH'")
                 .contains("method: 'DELETE'")
                 .contains("textContent = codeText");

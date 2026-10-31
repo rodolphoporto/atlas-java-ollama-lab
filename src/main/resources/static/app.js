@@ -243,7 +243,8 @@ function renderMetrics(answer, metrics) {
     }
     if (metrics.promptTokens !== null) entries.push(['Entrada', `${metrics.promptTokens} tokens`]);
     if (metrics.completionTokens !== null) entries.push(['Saída', `${metrics.completionTokens} tokens`]);
-    entries.push(['Contexto', `${metrics.contextMessages} msgs · ${metrics.contextCharacters} chars`]);
+    const messageUnit = metrics.contextMessages === 1 ? 'msg' : 'msgs';
+    entries.push(['Contexto', `${metrics.contextMessages} ${messageUnit} · ${metrics.contextCharacters} chars`]);
 
     for (const [label, value] of entries) {
         const metric = document.createElement('span');
