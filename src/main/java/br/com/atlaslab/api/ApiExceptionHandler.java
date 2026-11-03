@@ -1,6 +1,7 @@
 package br.com.atlaslab.api;
 
 import br.com.atlaslab.ollama.OllamaException;
+import br.com.atlaslab.ollama.ModelNotAllowedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,6 +29,15 @@ public class ApiExceptionHandler {
                 HttpStatus.BAD_GATEWAY,
                 exception.getMessage());
         problem.setTitle("Falha ao consultar o Ollama");
+        return problem;
+    }
+
+    @ExceptionHandler(ModelNotAllowedException.class)
+    ProblemDetail modelNotAllowed(ModelNotAllowedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST,
+                exception.getMessage());
+        problem.setTitle("Modelo não permitido");
         return problem;
     }
 }

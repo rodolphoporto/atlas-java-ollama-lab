@@ -73,8 +73,10 @@
     <section class="chat-card" aria-label="Chat com o Ollama">
         <div class="chat-toolbar">
             <div>
-                <span class="label">MODELO</span>
-                <strong>qwen3:4b-instruct</strong>
+                <label class="label" for="modelSelect">MODELO</label>
+                <select id="modelSelect" aria-label="Modelo de IA">
+                    <option>qwen3:4b-instruct</option>
+                </select>
             </div>
             <button class="text-button" id="clearButton" type="button">Limpar conversa</button>
         </div>
@@ -110,7 +112,7 @@
     </section>
 
     <footer>
-        <span>ATLAS-JAVA-008</span>
+        <span>ATLAS-JAVA-009</span>
         <span>Processamento local via túnel SSH</span>
     </footer>
 </main>

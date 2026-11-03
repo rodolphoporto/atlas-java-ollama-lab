@@ -21,6 +21,7 @@ const deleteConversationTitle = document.querySelector('#deleteConversationTitle
 const deleteError = document.querySelector('#deleteError');
 const cancelDeleteButton = document.querySelector('#cancelDeleteButton');
 const confirmDeleteButton = document.querySelector('#confirmDeleteButton');
+const modelSelect = document.querySelector('#modelSelect');
 
 let activeRequest = null;
 let activeConversationId = null;
@@ -35,6 +36,7 @@ function setStatus(status, label) {
 function setBusy(busy) {
     sendButton.disabled = busy;
     input.disabled = busy;
+    modelSelect.disabled = busy;
     stopButton.hidden = !busy;
     suggestions.hidden = busy;
     if (!busy) input.focus();
@@ -294,7 +296,11 @@ async function sendMessage(message) {
         const response = await fetch('/api/ai/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message, conversationId: activeConversationId }),
+            body: JSON.stringify({
+                message,
+                conversationId: activeConversationId,
+                model: modelSelect.value
+            }),
             signal: activeRequest.signal
         });
 
@@ -573,4 +579,22 @@ cancelDeleteButton.addEventListener('click', () => {
 
 newConversationButton.addEventListener('click', resetConversation);
 
-input.focus();
+async function loadModels() {
+    try {
+        const response = await fetch('/api/ai/models');
+        if (!response.ok) throw new Error();
+        const catalog = await response.json();
+        modelSelect.replaceChildren();
+        for (const model of catalog.models) {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            option.selected = model === catalog.defaultModel;
+            modelSelect.append(option);
+        }
+    } catch {
+        setStatus('error', 'Modelos indisponíveis');
+    }
+}
+
+loadModels().finally(() => input.focus());

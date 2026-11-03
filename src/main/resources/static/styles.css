@@ -149,7 +149,8 @@ button { color: inherit; }
 .chat-toolbar { min-height: 66px; padding: 0 22px; border-bottom: 1px solid var(--line); }
 .chat-toolbar > div { display: flex; flex-direction: column; gap: 3px; }
 .label { color: var(--muted); font-size: 9px; letter-spacing: 0.18em; }
-.chat-toolbar strong { font-size: 13px; font-weight: 600; }
+.chat-toolbar select { max-width: 240px; padding: 2px 24px 2px 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; }
+.chat-toolbar select:disabled { cursor: wait; opacity: .55; }
 .text-button { border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; }
 .text-button:hover { color: var(--accent); }
 

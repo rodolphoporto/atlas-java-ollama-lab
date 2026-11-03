@@ -10,10 +10,14 @@ Projeto de estudo com Java 21, Spring Boot 3.5 e Maven. Os endpoints enviam mens
 - Ollama ativo no `atlas`, com o modelo disponível
 - Docker Desktop para o PostgreSQL local
 
-No `atlas`, confirme ou instale o modelo:
+No `atlas`, confirme ou instale os modelos que deseja comparar:
 
 ```bash
 ollama pull qwen3:4b-instruct
+ollama pull qwen3.5:4b
+ollama pull qwen3.5:9b
+ollama pull gemma3:12b
+ollama pull llama3.1:8b
 ollama list
 ```
 
@@ -64,14 +68,22 @@ mvn spring-boot:run
 
 A API inicia, por padrão, em `http://localhost:8080`.
 
-Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. Ela consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento. Ao final de cada nova resposta, exibe tempo até o primeiro token, duração total, tokens por segundo, tokens de entrada/saída e tamanho do contexto. O histórico de conversas fica persistido no PostgreSQL e pode ser reaberto, renomeado ou excluído pelo botão **Histórico**. A exclusão exige confirmação e remove também as mensagens da conversa. Ao continuar uma conversa, uma janela recente desse histórico é enviada ao Ollama para que o modelo mantenha o contexto. As respostas suportam um subconjunto seguro de Markdown — títulos, listas, citações, ênfase, links HTTP/HTTPS e blocos de código com botão para copiar. HTML produzido pelo modelo não é interpretado.
+Abra [http://localhost:8080](http://localhost:8080) no navegador para usar a interface de chat. O seletor mostra somente os modelos definidos na lista permitida da aplicação; a API também rejeita nomes enviados fora dessa lista. A interface consome o endpoint SSE, monta a resposta progressivamente e permite interromper a geração em andamento. Ao final de cada nova resposta, exibe tempo até o primeiro token, duração total, tokens por segundo, tokens de entrada/saída e tamanho do contexto. O histórico de conversas fica persistido no PostgreSQL e pode ser reaberto, renomeado ou excluído pelo botão **Histórico**. A exclusão exige confirmação e remove também as mensagens da conversa. Ao continuar uma conversa, uma janela recente desse histórico é enviada ao Ollama para que o modelo mantenha o contexto. As respostas suportam um subconjunto seguro de Markdown — títulos, listas, citações, ênfase, links HTTP/HTTPS e blocos de código com botão para copiar. HTML produzido pelo modelo não é interpretado.
 
 ## 3. Testar o endpoint
+
+Consulte primeiro os modelos aceitos pela aplicação:
+
+```bash
+curl http://localhost:8080/api/ai/models
+```
+
+O nome enviado no campo `model` precisa constar nessa resposta. O campo pode ser omitido para usar o modelo padrão.
 
 ```bash
 curl -i http://localhost:8080/api/ai/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message":"Explique o que é uma record class em Java em duas frases."}'
+  -d '{"message":"Explique o que é uma record class em Java em duas frases.","model":"qwen3.5:9b"}'
 ```
 
 Resposta esperada:
@@ -170,6 +182,7 @@ Nenhum segredo é armazenado no projeto. As opções podem ser alteradas por var
 |---|---|---|
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Endereço do Ollama/túnel |
 | `OLLAMA_MODEL` | `qwen3:4b-instruct` | Modelo usado no chat |
+| `OLLAMA_ALLOWED_MODELS` | `qwen3:4b-instruct,qwen3.5:4b,qwen3.5:9b,gemma3:12b,llama3.1:8b` | Lista de modelos aceitos pela API e exibidos na interface |
 | `OLLAMA_CONNECT_TIMEOUT` | `2s` | Timeout de conexão |
 | `OLLAMA_READ_TIMEOUT` | `120s` | Timeout de resposta |
 | `AI_CONTEXT_MAX_MESSAGES` | `20` | Máximo de mensagens recentes enviadas ao modelo |
@@ -178,7 +191,7 @@ Nenhum segredo é armazenado no projeto. As opções podem ser alteradas por var
 Exemplo:
 
 ```bash
-OLLAMA_MODEL=qwen3:4b-instruct OLLAMA_READ_TIMEOUT=180s mvn spring-boot:run
+OLLAMA_MODEL=qwen3:4b-instruct OLLAMA_ALLOWED_MODELS=qwen3:4b-instruct,qwen3.5:9b OLLAMA_READ_TIMEOUT=180s mvn spring-boot:run
 ```
 
 ## Build e testes

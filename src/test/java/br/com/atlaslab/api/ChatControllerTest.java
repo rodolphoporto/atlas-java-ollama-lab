@@ -3,6 +3,7 @@ package br.com.atlaslab.api;
 import br.com.atlaslab.ollama.OllamaClient;
 import br.com.atlaslab.ollama.OllamaException;
 import br.com.atlaslab.ollama.OllamaProperties;
+import br.com.atlaslab.ollama.ModelRegistry;
 import br.com.atlaslab.history.ConversationStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,8 +36,15 @@ class ChatControllerTest {
     void setUp() {
         ollamaClient = new FakeOllamaClient();
         conversationStore = new FakeConversationStore();
+        var properties = new OllamaProperties(
+                URI.create("http://127.0.0.1:11434"),
+                "qwen3:4b-instruct",
+                List.of("qwen3:4b-instruct", "qwen3.5:9b"),
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(120));
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ChatController(ollamaClient, new ObjectMapper(), conversationStore))
+                .standaloneSetup(new ChatController(ollamaClient, new ObjectMapper(), conversationStore,
+                        new ModelRegistry(properties)))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }
@@ -71,6 +79,37 @@ class ChatControllerTest {
     }
 
     @Test
+    void listsOnlyConfiguredModels() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/ai/models"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultModel").value("qwen3:4b-instruct"))
+                .andExpect(jsonPath("$.models[0]").value("qwen3:4b-instruct"))
+                .andExpect(jsonPath("$.models[1]").value("qwen3.5:9b"))
+                .andExpect(jsonPath("$.models.length()").value(2));
+    }
+
+    @Test
+    void usesRequestedAllowedModel() throws Exception {
+        mockMvc.perform(post("/api/ai/chat")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"message\":\"Olá\",\"model\":\"qwen3.5:9b\"}"))
+                .andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(ollamaClient.receivedModel).isEqualTo("qwen3.5:9b");
+    }
+
+    @Test
+    void rejectsModelOutsideAllowListBeforeSavingMessage() throws Exception {
+        mockMvc.perform(post("/api/ai/chat")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"message\":\"Olá\",\"model\":\"modelo:nao-permitido\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Modelo não permitido"));
+
+        org.assertj.core.api.Assertions.assertThat(conversationStore.userMessages).isZero();
+    }
+
+    @Test
     void mapsOllamaFailureToBadGateway() throws Exception {
         ollamaClient.fail = true;
 
@@ -100,6 +139,9 @@ class ChatControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("\"tokensPerSecond\":100.0")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("\"promptTokens\":3")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("\"completionTokens\":2")));
+
+        org.assertj.core.api.Assertions.assertThat(ollamaClient.receivedModel)
+                .isEqualTo("qwen3:4b-instruct");
     }
 
     private static final class FakeOllamaClient extends OllamaClient {
@@ -111,24 +153,27 @@ class ChatControllerTest {
                     new OllamaProperties(
                             URI.create("http://127.0.0.1:11434"),
                             "qwen3:4b-instruct",
+                            List.of("qwen3:4b-instruct", "qwen3.5:9b"),
                             Duration.ofSeconds(2),
                             Duration.ofSeconds(120)),
                     new ObjectMapper());
         }
 
         @Override
-        public ChatResult chat(List<ChatMessage> messages) {
+        public ChatResult chat(String model, List<ChatMessage> messages) {
             if (fail) {
                 throw new OllamaException("Ollama indisponível");
             }
             receivedMessages = messages;
-            return new ChatResult("qwen3:4b-instruct", "Olá!",
+            receivedModel = model;
+            return new ChatResult(model, "Olá!",
                     new OllamaStats(30_000_000L, 3, 2, 20_000_000L));
         }
 
         @Override
-        public void streamChat(List<ChatMessage> messages, Consumer<StreamChunk> onChunk) {
+        public void streamChat(String model, List<ChatMessage> messages, Consumer<StreamChunk> onChunk) {
             receivedMessages = messages;
+            receivedModel = model;
             List.of(
                     new StreamChunk("qwen3:4b-instruct", "Olá", false),
                     new StreamChunk("qwen3:4b-instruct", "!", false),
@@ -138,14 +183,17 @@ class ChatControllerTest {
         }
 
         private List<ChatMessage> receivedMessages;
+        private String receivedModel;
     }
 
     private static final class FakeConversationStore implements ConversationStore {
         private final UUID id = UUID.fromString("11111111-1111-1111-1111-111111111111");
         private String assistantAnswer;
+        private int userMessages;
 
         @Override
         public UUID appendUserMessage(UUID conversationId, String content) {
+            userMessages++;
             return conversationId == null ? id : conversationId;
         }
 

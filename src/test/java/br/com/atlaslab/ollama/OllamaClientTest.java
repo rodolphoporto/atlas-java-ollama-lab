@@ -29,6 +29,7 @@ class OllamaClientTest {
         var properties = new OllamaProperties(
                 URI.create("http://127.0.0.1:11434"),
                 "qwen3:4b-instruct",
+                List.of("qwen3:4b-instruct", "qwen3.5:9b"),
                 Duration.ofSeconds(2),
                 Duration.ofSeconds(120));
         client = new OllamaClient(builder.build(), properties, new ObjectMapper());
@@ -121,6 +122,30 @@ class OllamaClientTest {
                 new OllamaClient.ChatMessage("user", "Qual é meu nome?")));
 
         assertThat(response.content()).isEqualTo("Seu nome é Rodolpho.");
+        server.verify();
+    }
+
+    @Test
+    void sendsExplicitSelectedModel() {
+        server.expect(requestTo("http://127.0.0.1:11434/api/chat"))
+                .andExpect(content().json("""
+                        {
+                          "model": "qwen3.5:9b",
+                          "messages": [{"role": "user", "content": "Olá"}],
+                          "stream": false
+                        }
+                        """))
+                .andRespond(withSuccess("""
+                        {
+                          "model": "qwen3.5:9b",
+                          "message": {"role": "assistant", "content": "Olá!"},
+                          "done": true
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        var response = client.chat("qwen3.5:9b", List.of(new OllamaClient.ChatMessage("user", "Olá")));
+
+        assertThat(response.model()).isEqualTo("qwen3.5:9b");
         server.verify();
     }
 }

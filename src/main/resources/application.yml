@@ -20,6 +20,7 @@ app:
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}
     model: ${OLLAMA_MODEL:qwen3:4b-instruct}
+    allowed-models: ${OLLAMA_ALLOWED_MODELS:qwen3:4b-instruct,qwen3.5:4b,qwen3.5:9b,gemma3:12b,llama3.1:8b}
     connect-timeout: ${OLLAMA_CONNECT_TIMEOUT:2s}
     read-timeout: ${OLLAMA_READ_TIMEOUT:120s}
 

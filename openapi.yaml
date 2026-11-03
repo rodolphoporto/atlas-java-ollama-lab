@@ -1,11 +1,22 @@
 openapi: 3.1.0
 info:
   title: ATLAS-JAVA-001 API
-  version: 0.5.0
-  description: API de estudo para conversar com o Ollama por resposta completa ou streaming SSE, com memória contextual, gerenciamento e métricas de inferência.
+  version: 0.6.0
+  description: API de estudo para conversar com modelos Ollama permitidos por resposta completa ou streaming SSE, com memória contextual, gerenciamento e métricas de inferência.
 servers:
   - url: http://localhost:8080
 paths:
+  /api/ai/models:
+    get:
+      summary: Lista os modelos que podem ser selecionados com segurança
+      operationId: listModels
+      responses:
+        '200':
+          description: Modelo padrão e lista permitida configurada pela aplicação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelsResponse'
   /api/ai/chat:
     post:
       summary: Envia uma mensagem e aguarda a resposta completa
@@ -25,7 +36,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChatResponse'
         '400':
-          description: Mensagem ausente ou vazia
+          description: Mensagem inválida ou modelo fora da lista permitida
         '404':
           description: conversationId não encontrado
         '502':
@@ -63,7 +74,7 @@ paths:
                     data: {"model":"qwen3:4b-instruct","done":true,"metrics":{"timeToFirstTokenMs":95,"totalDurationMs":1180,"tokensPerSecond":103.5,"promptTokens":42,"completionTokens":122,"contextMessages":3,"contextCharacters":286}}
 
         '400':
-          description: Mensagem ausente ou vazia
+          description: Mensagem inválida ou modelo fora da lista permitida
         '404':
           description: conversationId não encontrado
   /api/conversations:
@@ -130,6 +141,21 @@ components:
         conversationId:
           type: [string, 'null']
           format: uuid
+        model:
+          description: Modelo permitido a usar; quando omitido, usa o modelo padrão.
+          type: [string, 'null']
+          maxLength: 100
+    ModelsResponse:
+      type: object
+      required: [defaultModel, models]
+      properties:
+        defaultModel:
+          type: string
+        models:
+          type: array
+          minItems: 1
+          items:
+            type: string
     ChatResponse:
       type: object
       required: [model, answer, conversationId, metrics]

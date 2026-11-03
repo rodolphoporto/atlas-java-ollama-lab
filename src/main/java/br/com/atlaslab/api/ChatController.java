@@ -2,6 +2,7 @@ package br.com.atlaslab.api;
 
 import br.com.atlaslab.ollama.OllamaClient;
 import br.com.atlaslab.ollama.OllamaException;
+import br.com.atlaslab.ollama.ModelRegistry;
 import br.com.atlaslab.history.ConversationStore;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,20 +31,28 @@ public class ChatController {
     private final OllamaClient ollamaClient;
     private final ObjectMapper objectMapper;
     private final ConversationStore conversationStore;
+    private final ModelRegistry modelRegistry;
 
     public ChatController(OllamaClient ollamaClient, ObjectMapper objectMapper,
-                          ConversationStore conversationStore) {
+                          ConversationStore conversationStore, ModelRegistry modelRegistry) {
         this.ollamaClient = ollamaClient;
         this.objectMapper = objectMapper;
         this.conversationStore = conversationStore;
+        this.modelRegistry = modelRegistry;
+    }
+
+    @GetMapping("/models")
+    public ModelsResponse models() {
+        return new ModelsResponse(modelRegistry.defaultModel(), modelRegistry.allowedModels());
     }
 
     @PostMapping("/chat")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request) {
+        String model = modelRegistry.resolve(request.model());
         UUID conversationId = conversationStore.appendUserMessage(request.conversationId(), request.message());
         List<OllamaClient.ChatMessage> context = context(conversationId);
         long startedAt = System.nanoTime();
-        OllamaClient.ChatResult result = ollamaClient.chat(context);
+        OllamaClient.ChatResult result = ollamaClient.chat(model, context);
         conversationStore.appendAssistantMessage(conversationId, result.content());
         return new ChatResponse(result.model(), result.content(), conversationId,
                 metrics(startedAt, null, context, result.stats()));
@@ -50,6 +60,7 @@ public class ChatController {
 
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<StreamingResponseBody> stream(@Valid @RequestBody ChatRequest request) {
+        String model = modelRegistry.resolve(request.model());
         StreamingResponseBody body = output -> {
             UUID conversationId = conversationStore.appendUserMessage(request.conversationId(), request.message());
             writeEvent(output, "conversation", new ConversationStarted(conversationId));
@@ -58,7 +69,7 @@ public class ChatController {
             long startedAt = System.nanoTime();
             AtomicLong firstTokenAt = new AtomicLong();
             try {
-                ollamaClient.streamChat(context, chunk -> {
+                ollamaClient.streamChat(model, context, chunk -> {
                     try {
                         if (chunk.done()) {
                             conversationStore.appendAssistantMessage(conversationId, completeAnswer.toString());
@@ -124,7 +135,8 @@ public class ChatController {
 
     public record ChatRequest(@NotBlank(message = "message não pode estar vazio")
                               @Size(max = 8000, message = "message deve ter no máximo 8000 caracteres") String message,
-                              UUID conversationId) {
+                              UUID conversationId,
+                              @Size(max = 100, message = "model deve ter no máximo 100 caracteres") String model) {
     }
 
     public record ChatResponse(String model, String answer, UUID conversationId,
@@ -147,6 +159,9 @@ public class ChatController {
     }
 
     public record ConversationStarted(UUID conversationId) {
+    }
+
+    public record ModelsResponse(String defaultModel, List<String> models) {
     }
 
     private static final class StreamWriteException extends RuntimeException {

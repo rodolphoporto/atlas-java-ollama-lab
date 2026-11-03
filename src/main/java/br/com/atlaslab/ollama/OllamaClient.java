@@ -33,11 +33,15 @@ public class OllamaClient {
     }
 
     public void streamChat(List<ChatMessage> messages, Consumer<StreamChunk> onChunk) {
+        streamChat(properties.model(), messages, onChunk);
+    }
+
+    public void streamChat(String model, List<ChatMessage> messages, Consumer<StreamChunk> onChunk) {
         try {
             restClient.post()
                     .uri("/api/chat")
                     .body(new OllamaRequest(
-                            properties.model(),
+                            model,
                             messages,
                             true))
                     .exchange((request, response) -> {
@@ -74,11 +78,15 @@ public class OllamaClient {
     }
 
     public ChatResult chat(List<ChatMessage> messages) {
+        return chat(properties.model(), messages);
+    }
+
+    public ChatResult chat(String model, List<ChatMessage> messages) {
         try {
             OllamaResponse response = restClient.post()
                     .uri("/api/chat")
                     .body(new OllamaRequest(
-                            properties.model(),
+                            model,
                             messages,
                             false))
                     .retrieve()
