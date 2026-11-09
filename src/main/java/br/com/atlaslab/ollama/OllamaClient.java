@@ -14,6 +14,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.Map;
 
 @Service
 public class OllamaClient {
@@ -43,7 +44,8 @@ public class OllamaClient {
                     .body(new OllamaRequest(
                             model,
                             messages,
-                            true))
+                            true,
+                            false))
                     .exchange((request, response) -> {
                         HttpStatusCode status = response.getStatusCode();
                         if (status.isError()) {
@@ -88,6 +90,7 @@ public class OllamaClient {
                     .body(new OllamaRequest(
                             model,
                             messages,
+                            false,
                             false))
                     .retrieve()
                     .body(OllamaResponse.class);
@@ -108,7 +111,24 @@ public class OllamaClient {
         }
     }
 
-    record OllamaRequest(String model, List<ChatMessage> messages, boolean stream) {
+    public void unload(String model) {
+        try {
+            restClient.post()
+                    .uri("/api/generate")
+                    .body(Map.of("model", model, "prompt", "", "stream", false, "keep_alive", 0))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException exception) {
+            throw new OllamaException(
+                    "O Ollama não conseguiu descarregar o modelo (HTTP "
+                            + exception.getStatusCode().value() + ").", exception);
+        } catch (ResourceAccessException exception) {
+            throw new OllamaException(
+                    "Não foi possível acessar o Ollama para descarregar o modelo.", exception);
+        }
+    }
+
+    record OllamaRequest(String model, List<ChatMessage> messages, boolean stream, boolean think) {
     }
 
     record OllamaResponse(
@@ -116,16 +136,18 @@ public class OllamaClient {
             ChatMessage message,
             boolean done,
             @JsonProperty("total_duration") Long totalDurationNanos,
+            @JsonProperty("load_duration") Long loadDurationNanos,
             @JsonProperty("prompt_eval_count") Integer promptTokens,
             @JsonProperty("eval_count") Integer completionTokens,
             @JsonProperty("eval_duration") Long evalDurationNanos) {
 
         OllamaStats stats() {
-            if (totalDurationNanos == null && promptTokens == null
+            if (totalDurationNanos == null && loadDurationNanos == null && promptTokens == null
                     && completionTokens == null && evalDurationNanos == null) {
                 return null;
             }
-            return new OllamaStats(totalDurationNanos, promptTokens, completionTokens, evalDurationNanos);
+            return new OllamaStats(totalDurationNanos, loadDurationNanos,
+                    promptTokens, completionTokens, evalDurationNanos);
         }
     }
 
@@ -135,7 +157,7 @@ public class OllamaClient {
     public record ChatResult(String model, String content, OllamaStats stats) {
     }
 
-    public record OllamaStats(Long totalDurationNanos, Integer promptTokens,
+    public record OllamaStats(Long totalDurationNanos, Long loadDurationNanos, Integer promptTokens,
                               Integer completionTokens, Long evalDurationNanos) {
     }
 

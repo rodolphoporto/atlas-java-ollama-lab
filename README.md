@@ -156,6 +156,28 @@ O evento SSE `done` e a resposta completa incluem:
 
 As métricas aparecem somente nas respostas geradas durante a sessão atual; não são persistidas no histórico.
 
+### Benchmark de modelos locais
+
+A seção **Benchmark de modelos** executa uma combinação de modelo, prompt fixo e rodada por vez. Há seis cenários: explicação em português, código Java, correção de bug, raciocínio, aderência a formato e resistência à alucinação.
+
+- Rodada 1: solicita ao Ollama que descarregue o modelo antes da inferência e mede a partida fria.
+- Rodadas 2 e 3: mantêm o modelo carregado para medir o comportamento aquecido.
+- Resultados: armazenam resposta, primeiro token, duração total, tempo de carregamento, tokens por segundo e tokens de entrada/saída.
+- Qualidade: pode ser avaliada manualmente de 1 a 5, com uma observação opcional.
+- Comparabilidade: as execuções enviam `think: false`, evitando contabilizar raciocínio oculto como uma resposta vazia em modelos compatíveis.
+
+Somente um benchmark pode ser executado por vez. Os resultados permanecem no PostgreSQL e são exibidos do mais recente para o mais antigo.
+
+O painel consolidado ignora respostas vazias e calcula médias por modelo. O índice de equilíbrio usa qualidade (55%), velocidade (25%), primeiro token aquecido (10%) e duração aquecida (10%). A cobertura das 18 execuções esperadas reduz a confiança do índice quando um modelo possui poucos resultados; por isso, a recomendação é uma orientação local e não um ranking universal de modelos.
+
+Também é possível iniciar uma rodada pela API:
+
+```bash
+curl -i http://localhost:8080/api/benchmarks/runs \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen3.5:9b","promptId":"java-code","iteration":1}'
+```
+
 ### Gerenciar conversas
 
 Renomear uma conversa:

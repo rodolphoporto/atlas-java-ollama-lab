@@ -111,6 +111,33 @@
         </form>
     </section>
 
+    <section class="benchmark-card" aria-labelledby="benchmarkTitle">
+        <p class="eyebrow">ATLAS-JAVA-009</p>
+        <h2 id="benchmarkTitle">Benchmark de modelos</h2>
+        <p class="benchmark-copy">Execute uma rodada por vez. A primeira mede partida fria; as duas seguintes usam o modelo aquecido.</p>
+        <form id="benchmarkForm" class="benchmark-controls">
+            <label>Modelo<select id="benchmarkModel" required></select></label>
+            <label>Prompt<select id="benchmarkPrompt" required></select></label>
+            <label>Rodada<select id="benchmarkIteration"><option value="1">1 · fria</option><option value="2">2 · aquecida</option><option value="3">3 · aquecida</option></select></label>
+            <button class="send-button" id="benchmarkRun" type="submit">Executar</button>
+        </form>
+        <p class="benchmark-status" id="benchmarkStatus" aria-live="polite">Pronto para iniciar.</p>
+        <div class="benchmark-summary" id="benchmarkSummary" aria-label="Resumo comparativo dos modelos"></div>
+        <p class="benchmark-methodology" id="benchmarkMethodology"></p>
+        <div class="benchmark-table-wrap">
+            <table>
+                <thead><tr><th>Modelo</th><th>Prompt</th><th>Rodada</th><th>1º token</th><th>Total</th><th>Velocidade</th><th>Resposta</th><th>Qualidade</th></tr></thead>
+                <tbody id="benchmarkResults"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <dialog class="management-dialog benchmark-answer-dialog" id="benchmarkAnswerDialog">
+        <div class="dialog-heading"><span class="label">RESPOSTA DO BENCHMARK</span><strong id="benchmarkAnswerTitle"></strong></div>
+        <div class="message-content" id="benchmarkAnswerContent"></div>
+        <div class="dialog-actions"><button class="dialog-primary" id="closeBenchmarkAnswer" type="button">Fechar</button></div>
+    </dialog>
+
     <footer>
         <span>ATLAS-JAVA-009</span>
         <span>Processamento local via túnel SSH</span>

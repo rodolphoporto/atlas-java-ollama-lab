@@ -22,6 +22,19 @@ const deleteError = document.querySelector('#deleteError');
 const cancelDeleteButton = document.querySelector('#cancelDeleteButton');
 const confirmDeleteButton = document.querySelector('#confirmDeleteButton');
 const modelSelect = document.querySelector('#modelSelect');
+const benchmarkForm = document.querySelector('#benchmarkForm');
+const benchmarkModel = document.querySelector('#benchmarkModel');
+const benchmarkPrompt = document.querySelector('#benchmarkPrompt');
+const benchmarkIteration = document.querySelector('#benchmarkIteration');
+const benchmarkRun = document.querySelector('#benchmarkRun');
+const benchmarkStatus = document.querySelector('#benchmarkStatus');
+const benchmarkResults = document.querySelector('#benchmarkResults');
+const benchmarkSummary = document.querySelector('#benchmarkSummary');
+const benchmarkMethodology = document.querySelector('#benchmarkMethodology');
+const benchmarkAnswerDialog = document.querySelector('#benchmarkAnswerDialog');
+const benchmarkAnswerTitle = document.querySelector('#benchmarkAnswerTitle');
+const benchmarkAnswerContent = document.querySelector('#benchmarkAnswerContent');
+const closeBenchmarkAnswer = document.querySelector('#closeBenchmarkAnswer');
 
 let activeRequest = null;
 let activeConversationId = null;
@@ -585,16 +598,159 @@ async function loadModels() {
         if (!response.ok) throw new Error();
         const catalog = await response.json();
         modelSelect.replaceChildren();
+        benchmarkModel.replaceChildren();
         for (const model of catalog.models) {
-            const option = document.createElement('option');
-            option.value = model;
-            option.textContent = model;
-            option.selected = model === catalog.defaultModel;
-            modelSelect.append(option);
+            for (const select of [modelSelect, benchmarkModel]) {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                option.selected = model === catalog.defaultModel;
+                select.append(option);
+            }
         }
     } catch {
         setStatus('error', 'Modelos indisponíveis');
     }
 }
 
-loadModels().finally(() => input.focus());
+async function loadBenchmarkPrompts() {
+    const response = await fetch('/api/benchmarks/prompts');
+    if (!response.ok) throw new Error('Não foi possível carregar os prompts.');
+    benchmarkPrompt.replaceChildren();
+    for (const prompt of await response.json()) {
+        const option = document.createElement('option');
+        option.value = prompt.id;
+        option.textContent = prompt.title;
+        option.title = prompt.text;
+        benchmarkPrompt.append(option);
+    }
+}
+
+async function loadBenchmarkResults() {
+    const response = await fetch('/api/benchmarks/results');
+    if (!response.ok) return;
+    benchmarkResults.replaceChildren();
+    for (const result of await response.json()) {
+        const row = document.createElement('tr');
+        const values = [result.model, result.promptTitle,
+            result.coldStart ? '1 · fria' : `${result.iteration} · aquecida`,
+            result.timeToFirstTokenMs === null ? '—' : formatDuration(result.timeToFirstTokenMs),
+            formatDuration(result.totalDurationMs),
+            result.tokensPerSecond === null ? '—' : `${result.tokensPerSecond.toLocaleString('pt-BR')} tok/s`];
+        for (const value of values) {
+            const cell = document.createElement('td');
+            cell.textContent = value;
+            row.append(cell);
+        }
+        const answerCell = document.createElement('td');
+        const answerButton = document.createElement('button');
+        answerButton.type = 'button';
+        answerButton.className = 'benchmark-answer';
+        answerButton.textContent = 'Ver';
+        answerButton.dataset.answer = result.answer;
+        answerButton.dataset.title = `${result.model} · ${result.promptTitle} · rodada ${result.iteration}`;
+        answerCell.append(answerButton);
+        row.append(answerCell);
+        const qualityCell = document.createElement('td');
+        const quality = document.createElement('select');
+        quality.className = 'quality-select';
+        quality.dataset.id = result.id;
+        quality.innerHTML = '<option value="">—</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>';
+        quality.value = result.qualityScore || '';
+        quality.title = result.evaluationNotes || 'Selecione uma nota de 1 a 5';
+        qualityCell.append(quality);
+        row.append(qualityCell);
+        benchmarkResults.append(row);
+    }
+}
+
+function summaryValue(value, formatter) {
+    return value === null ? '—' : formatter(value);
+}
+
+async function loadBenchmarkSummary() {
+    const response = await fetch('/api/benchmarks/summary');
+    if (!response.ok) return;
+    const summary = await response.json();
+    benchmarkSummary.replaceChildren();
+    benchmarkMethodology.textContent = summary.methodology;
+    for (const model of summary.models) {
+        const card = document.createElement('article');
+        card.className = `benchmark-model-card${model.recommended ? ' recommended' : ''}`;
+        if (model.recommended) {
+            const badge = document.createElement('span');
+            badge.className = 'benchmark-badge';
+            badge.textContent = 'MELHOR EQUILÍBRIO';
+            card.append(badge);
+        }
+        const title = document.createElement('h3');
+        title.textContent = model.model;
+        const metrics = document.createElement('dl');
+        const entries = [
+            ['Índice', `${model.balanceScore.toLocaleString('pt-BR')} / 100`],
+            ['Qualidade', summaryValue(model.averageQuality, value => `${value.toLocaleString('pt-BR')} / 5`)],
+            ['Velocidade', summaryValue(model.averageTokensPerSecond, value => `${value.toLocaleString('pt-BR')} tok/s`)],
+            ['1º token', summaryValue(model.averageTimeToFirstTokenMs, formatDuration)],
+            ['Fria', summaryValue(model.averageColdDurationMs, formatDuration)],
+            ['Aquecida', summaryValue(model.averageWarmDurationMs, formatDuration)],
+            ['Cobertura', `${model.validRuns}/18 · ${model.coveragePercent.toLocaleString('pt-BR')}%`]
+        ];
+        for (const [name, value] of entries) {
+            const term = document.createElement('dt'); term.textContent = name;
+            const detail = document.createElement('dd'); detail.textContent = value;
+            metrics.append(term, detail);
+        }
+        card.append(title, metrics);
+        benchmarkSummary.append(card);
+    }
+}
+
+benchmarkForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    benchmarkRun.disabled = true;
+    benchmarkStatus.textContent = 'Executando benchmark — aguarde a resposta completa…';
+    try {
+        const response = await fetch('/api/benchmarks/runs', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: benchmarkModel.value, promptId: benchmarkPrompt.value,
+                iteration: Number(benchmarkIteration.value) })
+        });
+        if (!response.ok) {
+            const problem = await response.json().catch(() => ({}));
+            throw new Error(problem.detail || `Falha HTTP ${response.status}`);
+        }
+        await Promise.all([loadBenchmarkResults(), loadBenchmarkSummary()]);
+        benchmarkStatus.textContent = 'Rodada concluída e armazenada.';
+    } catch (error) {
+        benchmarkStatus.textContent = `Falha: ${error.message}`;
+    } finally {
+        benchmarkRun.disabled = false;
+    }
+});
+
+benchmarkResults.addEventListener('click', event => {
+    const button = event.target.closest('.benchmark-answer');
+    if (!button) return;
+    benchmarkAnswerTitle.textContent = button.dataset.title;
+    renderMarkdown(benchmarkAnswerContent, button.dataset.answer);
+    benchmarkAnswerDialog.showModal();
+});
+
+closeBenchmarkAnswer.addEventListener('click', () => benchmarkAnswerDialog.close());
+
+benchmarkResults.addEventListener('change', async event => {
+    const select = event.target.closest('.quality-select');
+    if (!select || !select.value) return;
+    const previous = select.title === 'Selecione uma nota de 1 a 5' ? '' : select.title;
+    const notes = window.prompt('Observação opcional sobre a qualidade desta resposta:', previous);
+    const response = await fetch(`/api/benchmarks/results/${encodeURIComponent(select.dataset.id)}/evaluation`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qualityScore: Number(select.value), notes })
+    });
+    benchmarkStatus.textContent = response.ok ? 'Avaliação salva.' : 'Não foi possível salvar a avaliação.';
+    if (response.ok) await Promise.all([loadBenchmarkResults(), loadBenchmarkSummary()]);
+});
+
+Promise.all([loadModels(), loadBenchmarkPrompts(), loadBenchmarkResults(), loadBenchmarkSummary()])
+    .catch(error => setStatus('error', error.message || 'Falha ao carregar'))
+    .finally(() => input.focus());

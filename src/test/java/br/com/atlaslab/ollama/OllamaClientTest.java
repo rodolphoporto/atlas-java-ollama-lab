@@ -42,7 +42,8 @@ class OllamaClientTest {
                         {
                           "model": "qwen3:4b-instruct",
                           "messages": [{"role": "user", "content": "Explique Java em uma frase"}],
-                          "stream": false
+                          "stream": false,
+                          "think": false
                         }
                         """))
                 .andRespond(withSuccess("""
@@ -51,6 +52,7 @@ class OllamaClientTest {
                           "message": {"role": "assistant", "content": "Java é uma linguagem multiplataforma."},
                           "done": true,
                           "total_duration": 1250000000,
+                          "load_duration": 250000000,
                           "prompt_eval_count": 18,
                           "eval_count": 12,
                           "eval_duration": 120000000
@@ -62,7 +64,7 @@ class OllamaClientTest {
         assertThat(response.model()).isEqualTo("qwen3:4b-instruct");
         assertThat(response.content()).isEqualTo("Java é uma linguagem multiplataforma.");
         assertThat(response.stats()).isEqualTo(
-                new OllamaClient.OllamaStats(1_250_000_000L, 18, 12, 120_000_000L));
+                new OllamaClient.OllamaStats(1_250_000_000L, 250_000_000L, 18, 12, 120_000_000L));
         server.verify();
     }
 
@@ -73,7 +75,8 @@ class OllamaClientTest {
                         {
                           "model": "qwen3:4b-instruct",
                           "messages": [{"role": "user", "content": "Olá"}],
-                          "stream": true
+                          "stream": true,
+                          "think": false
                         }
                         """))
                 .andRespond(withSuccess("""
@@ -90,7 +93,7 @@ class OllamaClientTest {
                 new OllamaClient.StreamChunk("qwen3:4b-instruct", "Olá", false),
                 new OllamaClient.StreamChunk("qwen3:4b-instruct", "!", false),
                 new OllamaClient.StreamChunk("qwen3:4b-instruct", "", true,
-                        new OllamaClient.OllamaStats(1_250_000_000L, 18, 12, 120_000_000L)));
+                        new OllamaClient.OllamaStats(1_250_000_000L, null, 18, 12, 120_000_000L)));
         server.verify();
     }
 
@@ -105,7 +108,8 @@ class OllamaClientTest {
                             {"role": "assistant", "content": "Prazer, Rodolpho!"},
                             {"role": "user", "content": "Qual é meu nome?"}
                           ],
-                          "stream": false
+                          "stream": false,
+                          "think": false
                         }
                         """))
                 .andRespond(withSuccess("""
@@ -132,7 +136,8 @@ class OllamaClientTest {
                         {
                           "model": "qwen3.5:9b",
                           "messages": [{"role": "user", "content": "Olá"}],
-                          "stream": false
+                          "stream": false,
+                          "think": false
                         }
                         """))
                 .andRespond(withSuccess("""

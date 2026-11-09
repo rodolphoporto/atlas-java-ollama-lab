@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: ATLAS-JAVA-001 API
-  version: 0.6.0
-  description: API de estudo para conversar com modelos Ollama permitidos por resposta completa ou streaming SSE, com memória contextual, gerenciamento e métricas de inferência.
+  version: 0.7.0
+  description: API de estudo para conversar com modelos Ollama permitidos e comparar seu desempenho em uma suíte persistente de benchmark.
 servers:
   - url: http://localhost:8080
 paths:
@@ -77,6 +77,58 @@ paths:
           description: Mensagem inválida ou modelo fora da lista permitida
         '404':
           description: conversationId não encontrado
+  /api/benchmarks/prompts:
+    get:
+      summary: Lista a suíte fixa de prompts do benchmark
+      responses:
+        '200':
+          description: Prompts versionados pela aplicação
+  /api/benchmarks/results:
+    get:
+      summary: Lista resultados do benchmark do mais recente para o mais antigo
+      responses:
+        '200':
+          description: Resultados persistidos com métricas e avaliação humana
+  /api/benchmarks/summary:
+    get:
+      summary: Consolida desempenho e qualidade por modelo
+      description: Ignora respostas vazias e calcula um índice transparente, ponderado também pela cobertura das 18 execuções esperadas.
+      responses:
+        '200':
+          description: Ranking por equilíbrio, médias por modelo e metodologia do índice
+  /api/benchmarks/runs:
+    post:
+      summary: Executa uma rodada de benchmark
+      description: A rodada 1 descarrega o modelo antes da inferência; as rodadas 2 e 3 mantêm o modelo aquecido.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BenchmarkRunRequest'
+      responses:
+        '200': { description: Rodada concluída e persistida }
+        '400': { description: Modelo, prompt ou rodada inválidos }
+        '409': { description: Já existe outro benchmark em execução }
+        '502': { description: Falha ao consultar o Ollama }
+  /api/benchmarks/results/{id}/evaluation:
+    patch:
+      summary: Registra avaliação humana de um resultado
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BenchmarkEvaluationRequest'
+      responses:
+        '200': { description: Avaliação salva }
+        '400': { description: Nota fora do intervalo de 1 a 5 }
+        '404': { description: Resultado não encontrado }
   /api/conversations:
     get:
       summary: Lista conversas por atualização mais recente
@@ -156,6 +208,19 @@ components:
           minItems: 1
           items:
             type: string
+    BenchmarkRunRequest:
+      type: object
+      required: [model, promptId, iteration]
+      properties:
+        model: { type: string, maxLength: 100 }
+        promptId: { type: string, maxLength: 50 }
+        iteration: { type: integer, minimum: 1, maximum: 3 }
+    BenchmarkEvaluationRequest:
+      type: object
+      required: [qualityScore]
+      properties:
+        qualityScore: { type: integer, minimum: 1, maximum: 5 }
+        notes: { type: [string, 'null'], maxLength: 1000 }
     ChatResponse:
       type: object
       required: [model, answer, conversationId, metrics]

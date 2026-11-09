@@ -167,7 +167,7 @@ class ChatControllerTest {
             receivedMessages = messages;
             receivedModel = model;
             return new ChatResult(model, "Olá!",
-                    new OllamaStats(30_000_000L, 3, 2, 20_000_000L));
+                    new OllamaStats(30_000_000L, null, 3, 2, 20_000_000L));
         }
 
         @Override
@@ -178,7 +178,7 @@ class ChatControllerTest {
                     new StreamChunk("qwen3:4b-instruct", "Olá", false),
                     new StreamChunk("qwen3:4b-instruct", "!", false),
                     new StreamChunk("qwen3:4b-instruct", "", true,
-                            new OllamaStats(30_000_000L, 3, 2, 20_000_000L)))
+                            new OllamaStats(30_000_000L, null, 3, 2, 20_000_000L)))
                     .forEach(onChunk);
         }
 
